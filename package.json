@@ -4,7 +4,8 @@
   "module": "index.ts",
   "type": "module",
   "scripts": {
-    "build": "bun run clean && bun run build.ts",
+    "build": "bun run clean && bun run build.ts && bun run build:types",
+    "build:types": "tsc -p tsconfig.json",
     "test": "bun test",
     "prepublishOnly": "bun run build",
     "publish:dry": "bun publish --dry-run",
