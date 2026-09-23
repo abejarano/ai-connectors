@@ -8,26 +8,25 @@ import { dirname, resolve } from "node:path"
 import { resolveStatusCode, VideoTransportError } from "../errors"
 import { toPlainObject } from "../helpers"
 import type { AIProviderConfigEntry } from "../types"
-import type { VideoGenerationRequest } from "../types/video-generation.request"
+import type {
+  VideoGenerationClient,
+  VideoGenerationCapabilities,
+  VideoGenerationRequest,
+  VideoGenerationResponse,
+} from "../types/video-generation.request"
 
 const DEFAULT_DURATION_SECONDS = 8
 const MIN_DURATION_SECONDS = 4
 const MID_DURATION_SECONDS = 6
 const MAX_DURATION_SECONDS = 8
 
-export type VideoAssetRef = {
-  kind: "file"
-  path: string
-}
+export class GeminiGenerateVideoClient implements VideoGenerationClient {
+  readonly capabilities: VideoGenerationCapabilities = {
+    provider: "gemini",
+    negativePrompt: true,
+    polling: true,
+  }
 
-export type VideoGenerationResponse = {
-  asset: VideoAssetRef
-  mimeType: string
-  sizeBytes: number
-  durationSeconds: number
-}
-
-export class GeminiGenerateVideoClient {
   private ai: GoogleGenAI
 
   constructor(private readonly cfg: AIProviderConfigEntry) {

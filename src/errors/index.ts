@@ -95,6 +95,26 @@ export class TextTransportError extends ProviderError {
   }
 }
 
+export class UnsupportedTextGenerationCapabilityError extends ProviderError {
+  constructor(capability: string, provider: string) {
+    super(
+      `Provider '${provider}' does not support text generation capability '${capability}'.`,
+      "text_generation_capability_unsupported",
+      { capability, provider }
+    )
+  }
+}
+
+export class UnsupportedGenerationProviderError extends ProviderError {
+  constructor(capability: "text" | "image" | "video", provider: string) {
+    super(
+      `Provider '${provider}' is not supported for ${capability} generation.`,
+      "generation_provider_unsupported",
+      { capability, provider }
+    )
+  }
+}
+
 export class ImageTransportError extends Error {
   readonly code = "image_transport_error"
   readonly statusCode?: number

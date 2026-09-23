@@ -48,13 +48,17 @@ export const normalizeTokenUsage = (usage: unknown): TextUsage | undefined => {
         ? value.totalTokenCount
         : undefined
 
+  const cachedTokenDetails =
+    value.input_tokens_details && typeof value.input_tokens_details === "object"
+      ? (value.input_tokens_details as Record<string, unknown>)
+      : value.prompt_tokens_details &&
+          typeof value.prompt_tokens_details === "object"
+        ? (value.prompt_tokens_details as Record<string, unknown>)
+        : undefined
+
   const cachedInputTokens =
-    value.input_tokens_details &&
-    typeof value.input_tokens_details === "object" &&
-    typeof (value.input_tokens_details as Record<string, unknown>)
-      .cached_tokens === "number"
-      ? ((value.input_tokens_details as Record<string, unknown>)
-          .cached_tokens as number)
+    typeof cachedTokenDetails?.cached_tokens === "number"
+      ? cachedTokenDetails.cached_tokens
       : typeof value.cachedContentTokenCount === "number"
         ? value.cachedContentTokenCount
         : undefined

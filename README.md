@@ -1,15 +1,16 @@
 # @abejarano/ai-connectors
 
-Paquete TypeScript para integrar Google Gemini con una API pequeña y enfocada. Expone clientes para generación de texto, imagen y video, junto con tipos compartidos, manejo normalizado de errores y utilidades de soporte.
+Paquete TypeScript para integrar proveedores de IA mediante adapters neutrales de texto, imagen y vídeo. Expone contratos compartidos, manejo normalizado de errores y utilidades de soporte.
 
 ## Características
 
 - Generación de texto con soporte de streaming
 - Salida estructurada con JSON Schema
+- Generación de texto DeepSeek mediante su API de Chat Completions
 - Generación de imágenes con persistencia en archivo
 - Generación de video con polling configurable
 - Errores de transporte normalizados con información de retry
-- Tipos ligeros para integrar el paquete sin capas extra
+- Selección explícita de proveedor sin dependencias de clientes concretos
 
 ## Instalación
 
@@ -27,33 +28,43 @@ pnpm add @abejarano/ai-connectors
 ## Requisitos
 
 - Node.js 20 o superior
-- Una API key válida de Google Gemini
+- Una API key válida del proveedor seleccionado
 - TypeScript 5 si lo consumes desde un proyecto TS
 
 ## API pública
 
 El export raíz del paquete publica actualmente:
 
-- `GeminiGenerateImageClient`
-- `ImageGenerationResponse`
-- `ImageGenerationRequest`
-- `GeminiGenerateTextClient`
+- `TextGenerationAdapter`
+- `ImageGenerationAdapter`
+- `VideoGenerationAdapter`
+- `TextGenerationAdapterConfig`
+- `ImageGenerationAdapterConfig`
+- `VideoGenerationAdapterConfig`
 - `TextGenerationResponse`
 - `TextGenerationRequest`
-- `StructuredOutputFormat`
-- `TextRetryPolicy`
-- `GeminiGenerateVideoClient`
+- `TextGenerationClient`
+- `ImageGenerationResponse`
+- `ImageGenerationRequest`
+- `ImageGenerationClient`
+- `ImageGenerationCapabilities`
 - `VideoGenerationResponse`
 - `VideoGenerationRequest`
+- `VideoGenerationClient`
+- `VideoGenerationCapabilities`
+- `TextGenerationCapabilities`
+- `StructuredOutputFormat`
+- `TextRetryPolicy`
 
 ## Uso
 
 ### Generación de texto
 
 ```ts
-import { GeminiGenerateTextClient } from "@abejarano/ai-connectors"
+import { TextGenerationAdapter } from "@abejarano/ai-connectors"
 
-const client = new GeminiGenerateTextClient({
+const client = new TextGenerationAdapter({
+  provider: "gemini",
   apiKey: process.env.GEMINI_API_KEY!,
   model: "gemini-2.5-flash",
 })
@@ -71,9 +82,10 @@ console.log(result.usage)
 ### Texto con streaming
 
 ```ts
-import { GeminiGenerateTextClient } from "@abejarano/ai-connectors"
+import { TextGenerationAdapter } from "@abejarano/ai-connectors"
 
-const client = new GeminiGenerateTextClient({
+const client = new TextGenerationAdapter({
+  provider: "gemini",
   apiKey: process.env.GEMINI_API_KEY!,
   model: "gemini-2.5-flash",
 })
@@ -90,12 +102,36 @@ const result = await client.execute({
 console.log(result.text)
 ```
 
+### Generación de texto con DeepSeek
+
+```ts
+import { TextGenerationAdapter } from "@abejarano/ai-connectors"
+
+const client = new TextGenerationAdapter({
+  provider: "deepseek",
+  apiKey: process.env.DEEPSEEK_API_KEY!,
+  model: "deepseek-flash",
+})
+
+const result = await client.execute({
+  systemPrompt: "Responde de forma breve y clara.",
+  userPrompt: "Escribe una descripción corta de un cuaderno premium.",
+  maxOutputTokens: 256,
+})
+
+console.log(result.text)
+console.log(result.usage)
+```
+
+DeepSeek soporta streaming y function tools normalizados en `TextGenerationRequest`. Para salida estructurada, garantiza un objeto JSON, pero no la conformidad estricta con JSON Schema: las solicitudes con `responseFormat.strict: true` fallan localmente antes de llamar al proveedor. DeepSeek puede analizar imágenes de entrada, pero no genera imágenes; usa `ImageGenerationAdapter` con `provider: "gemini"` para generar assets.
+
 ### Salida estructurada
 
 ```ts
-import { GeminiGenerateTextClient } from "@abejarano/ai-connectors"
+import { TextGenerationAdapter } from "@abejarano/ai-connectors"
 
-const client = new GeminiGenerateTextClient({
+const client = new TextGenerationAdapter({
+  provider: "gemini",
   apiKey: process.env.GEMINI_API_KEY!,
   model: "gemini-2.5-flash",
 })
@@ -123,10 +159,13 @@ console.log(result.text)
 
 ### Generación de imágenes
 
-```ts
-import { GeminiGenerateImageClient } from "@abejarano/ai-connectors"
+La generación de imágenes está disponible actualmente sólo con `provider: "gemini"`.
 
-const client = new GeminiGenerateImageClient({
+```ts
+import { ImageGenerationAdapter } from "@abejarano/ai-connectors"
+
+const client = new ImageGenerationAdapter({
+  provider: "gemini",
   apiKey: process.env.GEMINI_API_KEY!,
   model: "gemini-2.0-flash-preview-image-generation",
 })
@@ -146,10 +185,13 @@ console.log(result.width, result.height)
 
 ### Generación de video
 
-```ts
-import { GeminiGenerateVideoClient } from "@abejarano/ai-connectors"
+La generación de vídeo está disponible actualmente sólo con `provider: "gemini"`.
 
-const client = new GeminiGenerateVideoClient({
+```ts
+import { VideoGenerationAdapter } from "@abejarano/ai-connectors"
+
+const client = new VideoGenerationAdapter({
+  provider: "gemini",
   apiKey: process.env.GEMINI_API_KEY!,
   model: "gemini-2.5-flash-video",
 })
@@ -174,6 +216,8 @@ El paquete normaliza los fallos del proveedor para que el consumidor pueda reacc
 - `TextTransportError`
 - `ImageTransportError`
 - `VideoTransportError`
+- `UnsupportedGenerationProviderError`
+- `UnsupportedTextGenerationCapabilityError`
 
 En texto, el error expone un `retryable` en los detalles cuando el fallo parece transitorio.
 
