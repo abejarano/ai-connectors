@@ -2,15 +2,25 @@ import { type GenerateContentConfig, GoogleGenAI } from "@google/genai"
 import { createTextTransportError, resolveStatusCode } from "../errors"
 import type { TextTransportError } from "../errors"
 import { normalizeTokenUsage, toPlainObject } from "../helpers"
-import type { AIProviderConfigEntry, TextUsage } from "../types"
-import type { TextGenerationRequest } from "../types/text-generation.request"
+import type { AIProviderConfigEntry } from "../types"
+import type {
+  TextGenerationCapabilities,
+  TextGenerationClient,
+  TextGenerationRequest,
+  TextGenerationResponse,
+  TextToolCall,
+} from "../types/text-generation.request"
 
-export type TextGenerationResponse = {
-  text: string
-  usage?: TextUsage
-}
+export class GeminiGenerateTextClient implements TextGenerationClient {
+  readonly capabilities: TextGenerationCapabilities = {
+    streaming: true,
+    functionTools: true,
+    structuredOutput: {
+      jsonObject: true,
+      jsonSchema: "enforced",
+    },
+  }
 
-export class GeminiGenerateTextClient {
   private ai: GoogleGenAI
 
   constructor(private readonly cfg: AIProviderConfigEntry) {
@@ -118,6 +128,7 @@ export class GeminiGenerateTextClient {
           (typeof fallbackText === "string" ? fallbackText.trim() : ""),
 
         usage: normalizeTokenUsage(usageSource),
+        toolCalls: this.resolveToolCalls(lastChunk),
       }
     }
 
@@ -130,6 +141,7 @@ export class GeminiGenerateTextClient {
     return {
       text: response.text?.trim() || "",
       usage: normalizeTokenUsage(response.usageMetadata),
+      toolCalls: this.resolveToolCalls(response),
     }
   }
 
@@ -206,11 +218,41 @@ export class GeminiGenerateTextClient {
       config.responseJsonSchema = context.responseFormat.schema
     }
 
-    if (context.tools) {
-      config.tools = context.tools
+    if (context.tools?.length) {
+      config.tools = [
+        {
+          functionDeclarations: context.tools.map((tool) => tool.function),
+        },
+      ]
     }
 
     return config
+  }
+
+  private resolveToolCalls(response: unknown): TextToolCall[] | undefined {
+    if (!response || typeof response !== "object") return undefined
+
+    const functionCalls = (response as { functionCalls?: unknown })
+      .functionCalls
+    if (!Array.isArray(functionCalls) || functionCalls.length === 0) {
+      return undefined
+    }
+
+    const toolCalls = functionCalls.flatMap((call): TextToolCall[] => {
+      if (!call || typeof call !== "object") return []
+      const value = call as Record<string, unknown>
+      if (typeof value.name !== "string" || !value.name) return []
+
+      return [
+        {
+          id: typeof value.id === "string" ? value.id : value.name,
+          name: value.name,
+          arguments: JSON.stringify(value.args ?? {}),
+        },
+      ]
+    })
+
+    return toolCalls.length > 0 ? toolCalls : undefined
   }
 }
 

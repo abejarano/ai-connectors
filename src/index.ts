@@ -1,23 +1,44 @@
 export {
-  GeminiGenerateImageClient,
-  type ImageGenerationResponse,
-} from "./clients/gemini-generate-image.client"
-
+  ImageGenerationAdapter,
+  type ImageGenerationAdapterConfig,
+} from "./adapters/image-generation.adapter"
 export {
-  GeminiGenerateTextClient,
-  type TextGenerationResponse,
-} from "./clients/gemini-generate-text.client"
+  TextGenerationAdapter,
+  type TextGenerationAdapterConfig,
+} from "./adapters/text-generation.adapter"
+export {
+  VideoGenerationAdapter,
+  type VideoGenerationAdapterConfig,
+} from "./adapters/video-generation.adapter"
 
-export type { ImageGenerationRequest } from "./types/image-generation.request"
+export type {
+  ImageAssetRef,
+  ImageGenerationCapabilities,
+  ImageGenerationClient,
+  ImageGenerationRequest,
+  ImageGenerationResponse,
+} from "./types/image-generation.request"
 export type {
   StructuredOutputFormat,
+  TextFunctionTool,
+  TextGenerationCapabilities,
+  TextGenerationClient,
   TextGenerationRequest,
+  TextGenerationResponse,
   TextRetryPolicy,
+  TextToolCall,
+  TextToolChoice,
 } from "./types/text-generation.request"
 
 export {
-  GeminiGenerateVideoClient,
-  type VideoGenerationResponse,
-} from "./clients/gemini-generate-video.client"
+  UnsupportedGenerationProviderError,
+  UnsupportedTextGenerationCapabilityError,
+} from "./errors"
 
-export type { VideoGenerationRequest } from "./types/video-generation.request"
+export type {
+  VideoAssetRef,
+  VideoGenerationCapabilities,
+  VideoGenerationClient,
+  VideoGenerationRequest,
+  VideoGenerationResponse,
+} from "./types/video-generation.request"

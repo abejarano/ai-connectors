@@ -5,22 +5,20 @@ import { ImageTransportError, resolveStatusCode } from "../errors"
 import { toPlainObject } from "../helpers"
 import { inspectImageAsset } from "../helpers/image-asset"
 import type { AIProviderConfigEntry } from "../types"
-import type { ImageGenerationRequest } from "../types/image-generation.request"
+import type {
+  ImageGenerationClient,
+  ImageGenerationCapabilities,
+  ImageGenerationRequest,
+  ImageGenerationResponse,
+} from "../types/image-generation.request"
 
-export type ImageAssetRef = {
-  kind: "file"
-  path: string
-}
+export class GeminiGenerateImageClient implements ImageGenerationClient {
+  readonly capabilities: ImageGenerationCapabilities = {
+    provider: "gemini",
+    negativePrompt: true,
+    aspectRatio: true,
+  }
 
-export type ImageGenerationResponse = {
-  asset: ImageAssetRef
-  mimeType: string
-  sizeBytes: number
-  width: number
-  height: number
-}
-
-export class GeminiGenerateImageClient {
   private ai: GoogleGenAI
 
   constructor(private readonly cfg: AIProviderConfigEntry) {
@@ -29,7 +27,9 @@ export class GeminiGenerateImageClient {
     })
   }
 
-  async execute(context: ImageGenerationRequest) {
+  async execute(
+    context: ImageGenerationRequest
+  ): Promise<ImageGenerationResponse> {
     let response: unknown
 
     try {

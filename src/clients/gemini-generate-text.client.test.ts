@@ -105,6 +105,57 @@ describe("GeminiGenerateTextClient", () => {
     expect(generateContentStream).toHaveBeenCalledTimes(1)
     expect(chunks).toEqual(["First chunk"])
   })
+
+  test("maps neutral function tools and returned function calls", async () => {
+    const generateContent = mock(async () => ({
+      text: "",
+      functionCalls: [
+        {
+          id: "gemini-call-1",
+          name: "get_weather",
+          args: { city: "SP" },
+        },
+      ],
+    }))
+    const client = createClient(generateContent)
+
+    const result = await client.execute({
+      systemPrompt: "System",
+      userPrompt: "User",
+      tools: [
+        {
+          type: "function",
+          function: {
+            name: "get_weather",
+            parameters: { type: "object" },
+          },
+        },
+      ],
+    })
+
+    expect(generateContent).toHaveBeenCalledWith({
+      model: "gemini-2.5-flash",
+      contents: "User",
+      config: {
+        abortSignal: expect.any(AbortSignal),
+        systemInstruction: "System",
+        tools: [
+          {
+            functionDeclarations: [
+              { name: "get_weather", parameters: { type: "object" } },
+            ],
+          },
+        ],
+      },
+    })
+    expect(result.toolCalls).toEqual([
+      {
+        id: "gemini-call-1",
+        name: "get_weather",
+        arguments: '{"city":"SP"}',
+      },
+    ])
+  })
 })
 
 const createClient = (generateContent: ReturnType<typeof mock>) => {
