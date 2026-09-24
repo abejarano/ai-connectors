@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { UnsupportedGenerationProviderError } from "../errors"
 import { ImageGenerationAdapter } from "./image-generation.adapter"
+import { MultimodalGenerationAdapter } from "./multimodal-generation.adapter"
 import { TextGenerationAdapter } from "./text-generation.adapter"
 import { VideoGenerationAdapter } from "./video-generation.adapter"
 
@@ -38,6 +39,31 @@ describe("generation adapters", () => {
     })
 
     expect(adapter.capabilities.structuredOutput.jsonSchema).toBe("enforced")
+  })
+
+  test("selects provider-specific multimodal capabilities", () => {
+    const gemini = new MultimodalGenerationAdapter({
+      provider: "gemini",
+      apiKey: "test-key",
+      model: "gemini-2.5-flash",
+    })
+
+    const deepseek = new MultimodalGenerationAdapter({
+      provider: "deepseek",
+      apiKey: "test-key",
+      model: "deepseek-vl",
+    })
+
+    expect(gemini.capabilities).toEqual({
+      provider: "gemini",
+      imageInput: true,
+      structuredOutput: { jsonObject: true, jsonSchema: "enforced" },
+    })
+    expect(deepseek.capabilities).toEqual({
+      provider: "deepseek",
+      imageInput: true,
+      structuredOutput: { jsonObject: true, jsonSchema: "best_effort" },
+    })
   })
 
   test("delegates image and video generation to the selected client", async () => {

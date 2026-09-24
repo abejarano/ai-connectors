@@ -7,6 +7,10 @@ export {
   type TextGenerationAdapterConfig,
 } from "./adapters/text-generation.adapter"
 export {
+  MultimodalGenerationAdapter,
+  type MultimodalGenerationAdapterConfig,
+} from "./adapters/multimodal-generation.adapter"
+export {
   VideoGenerationAdapter,
   type VideoGenerationAdapterConfig,
 } from "./adapters/video-generation.adapter"
@@ -29,6 +33,12 @@ export type {
   TextToolCall,
   TextToolChoice,
 } from "./types/text-generation.request"
+export type {
+  MultimodalGenerationClient,
+  MultimodalGenerationCapabilities,
+  MultimodalGenerationRequest,
+  MultimodalInputImage,
+} from "./types/multimodal-generation.request"
 
 export {
   UnsupportedGenerationProviderError,

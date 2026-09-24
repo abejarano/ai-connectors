@@ -36,6 +36,7 @@ pnpm add @abejarano/ai-connectors
 El export raíz del paquete publica actualmente:
 
 - `TextGenerationAdapter`
+- `MultimodalGenerationAdapter`
 - `ImageGenerationAdapter`
 - `VideoGenerationAdapter`
 - `TextGenerationAdapterConfig`
@@ -151,6 +152,36 @@ const result = await client.execute({
       required: ["title", "summary"],
       additionalProperties: false,
     },
+  },
+})
+
+console.log(result.text)
+```
+
+### Análisis multimodal
+
+Usa `MultimodalGenerationAdapter` cuando el modelo deba analizar bytes de imagen
+y devolver texto o JSON estructurado. El contrato es agnóstico del proveedor;
+cada implementación traduce los bytes a su formato nativo sin convertirlos en
+una descripción textual. Gemini y DeepSeek están disponibles actualmente.
+
+```ts
+import { MultimodalGenerationAdapter } from "@abejarano/ai-connectors"
+
+const client = new MultimodalGenerationAdapter({
+  provider: "gemini",
+  apiKey: process.env.GEMINI_API_KEY!,
+  model: "gemini-2.5-flash",
+})
+
+const result = await client.execute({
+  systemPrompt: "Devuelve solo JSON válido.",
+  userPrompt: "Propón una composición para esta imagen.",
+  images: [{ bytes: imageBytes, mimeType: "image/png" }],
+  responseFormat: {
+    type: "json_schema",
+    name: "composition",
+    schema: { type: "object" },
   },
 })
 
