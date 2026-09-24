@@ -106,7 +106,10 @@ export class UnsupportedTextGenerationCapabilityError extends ProviderError {
 }
 
 export class UnsupportedGenerationProviderError extends ProviderError {
-  constructor(capability: "text" | "image" | "video", provider: string) {
+  constructor(
+    capability: "text" | "image" | "video" | "multimodal",
+    provider: string
+  ) {
     super(
       `Provider '${provider}' is not supported for ${capability} generation.`,
       "generation_provider_unsupported",
