@@ -28,5 +28,7 @@ export type MultimodalGenerationCapabilities = {
 
 export interface MultimodalGenerationClient {
   readonly capabilities: MultimodalGenerationCapabilities
+  readonly model: string
+
   execute(context: MultimodalGenerationRequest): Promise<TextGenerationResponse>
 }

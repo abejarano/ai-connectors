@@ -3,11 +3,12 @@ import { createTextTransportError, resolveStatusCode } from "../errors"
 import { toPlainObject } from "../helpers"
 import type { AIProviderConfigEntry } from "../types"
 import type {
-  MultimodalGenerationClient,
   MultimodalGenerationCapabilities,
+  MultimodalGenerationClient,
   MultimodalGenerationRequest,
 } from "../types/multimodal-generation.request"
 import type { TextGenerationResponse } from "../types/text-generation.request"
+import { Buffer } from "node:buffer"
 
 export class GeminiGenerateMultimodalClient implements MultimodalGenerationClient {
   readonly capabilities: MultimodalGenerationCapabilities = {
@@ -23,6 +24,10 @@ export class GeminiGenerateMultimodalClient implements MultimodalGenerationClien
 
   constructor(private readonly cfg: AIProviderConfigEntry) {
     this.ai = new GoogleGenAI({ apiKey: cfg.apiKey })
+  }
+
+  get model(): string {
+    return this.cfg.model
   }
 
   async execute(

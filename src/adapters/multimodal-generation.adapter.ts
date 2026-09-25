@@ -2,8 +2,8 @@ import { DeepSeekGenerateMultimodalClient } from "../clients/deepseek-generate-m
 import { GeminiGenerateMultimodalClient } from "../clients/gemini-generate-multimodal.client"
 import { UnsupportedGenerationProviderError } from "../errors"
 import type {
-  MultimodalGenerationClient,
   MultimodalGenerationCapabilities,
+  MultimodalGenerationClient,
   MultimodalGenerationRequest,
 } from "../types/multimodal-generation.request"
 import type { TextGenerationResponse } from "../types/text-generation.request"
@@ -36,6 +36,10 @@ export class MultimodalGenerationAdapter implements MultimodalGenerationClient {
 
   get capabilities(): MultimodalGenerationCapabilities {
     return this.client.capabilities
+  }
+
+  get model(): string {
+    return this.client.model
   }
 
   execute(

@@ -11,6 +11,7 @@ import type {
   MultimodalGenerationRequest,
 } from "../types/multimodal-generation.request"
 import type { TextGenerationResponse } from "../types/text-generation.request"
+import { Buffer } from "node:buffer"
 
 const DEFAULT_BASE_URL = "https://api.deepseek.com"
 
@@ -40,6 +41,10 @@ export class DeepSeekGenerateMultimodalClient implements MultimodalGenerationCli
     private readonly fetchImpl: FetchImplementation = fetch
   ) {
     this.baseUrl = (cfg.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, "")
+  }
+
+  get model(): string {
+    return this.cfg.model
   }
 
   async execute(
