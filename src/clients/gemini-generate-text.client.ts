@@ -219,7 +219,10 @@ export class GeminiGenerateTextClient implements TextGenerationClient {
 
     if (context.responseFormat) {
       config.responseMimeType = "application/json"
-      config.responseJsonSchema = context.responseFormat.schema
+
+      if (context.responseFormat.type === "json_schema") {
+        config.responseJsonSchema = context.responseFormat.schema
+      }
     }
 
     if (context.tools?.length) {

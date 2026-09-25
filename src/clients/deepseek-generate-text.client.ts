@@ -91,7 +91,10 @@ export class DeepSeekGenerateTextClient implements TextGenerationClient {
   async execute(
     context: TextGenerationRequest
   ): Promise<TextGenerationResponse> {
-    if (context.responseFormat?.strict) {
+    if (
+      context.responseFormat?.type === "json_schema" &&
+      context.responseFormat.strict
+    ) {
       throw new UnsupportedTextGenerationCapabilityError(
         "strict_json_schema",
         "deepseek"
@@ -226,13 +229,18 @@ export class DeepSeekGenerateTextClient implements TextGenerationClient {
 
   private buildSystemPrompt(context: TextGenerationRequest): string {
     const prompt = context.systemPrompt.trim()
-    if (!context.responseFormat) return prompt
+    const responseFormat = context.responseFormat
+    if (!responseFormat) return prompt
+
+    if (responseFormat.type === "json_object") {
+      return [prompt, "Return only a JSON object."].join("\n\n")
+    }
 
     return [
       prompt,
       "Return only a JSON object.",
-      `Target schema '${context.responseFormat.name}' (guidance only):`,
-      JSON.stringify(context.responseFormat.schema),
+      `Target schema '${responseFormat.name}' (guidance only):`,
+      JSON.stringify(responseFormat.schema),
     ].join("\n\n")
   }
 

@@ -50,7 +50,10 @@ export class DeepSeekGenerateMultimodalClient implements MultimodalGenerationCli
   async execute(
     context: MultimodalGenerationRequest
   ): Promise<TextGenerationResponse> {
-    if (context.responseFormat?.strict) {
+    if (
+      context.responseFormat?.type === "json_schema" &&
+      context.responseFormat.strict
+    ) {
       throw new UnsupportedTextGenerationCapabilityError(
         "strict_json_schema",
         "deepseek"
@@ -69,7 +72,7 @@ export class DeepSeekGenerateMultimodalClient implements MultimodalGenerationCli
           body: JSON.stringify({
             model: this.cfg.model,
             messages: [
-              { role: "system", content: context.systemPrompt.trim() },
+              { role: "system", content: this.buildSystemPrompt(context) },
               {
                 role: "user",
                 content: [
@@ -121,5 +124,22 @@ export class DeepSeekGenerateMultimodalClient implements MultimodalGenerationCli
         cause: error,
       })
     }
+  }
+
+  private buildSystemPrompt(context: MultimodalGenerationRequest): string {
+    const prompt = context.systemPrompt.trim()
+    const responseFormat = context.responseFormat
+    if (!responseFormat) return prompt
+
+    if (responseFormat.type === "json_object") {
+      return [prompt, "Return only a JSON object."].join("\n\n")
+    }
+
+    return [
+      prompt,
+      "Return only a JSON object.",
+      `Target schema '${responseFormat.name}' (guidance only):`,
+      JSON.stringify(responseFormat.schema),
+    ].join("\n\n")
   }
 }

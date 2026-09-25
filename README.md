@@ -158,6 +158,23 @@ const result = await client.execute({
 console.log(result.text)
 ```
 
+Si sólo necesitas garantizar un objeto JSON válido, sin imponer un esquema,
+usa la variante `json_object`:
+
+```ts
+const result = await client.execute({
+  systemPrompt: "Devuelve solo JSON válido.",
+  userPrompt: "Genera un objeto con title y summary.",
+  responseFormat: { type: "json_object" },
+})
+
+console.log(result.text)
+```
+
+`StructuredOutputFormat` es una unión discriminada por `type`, por lo que
+`type: "json_schema"` conserva `name`, `schema` y el `strict` opcional, mientras
+que `type: "json_object"` no envía ningún esquema al proveedor.
+
 ### Análisis multimodal
 
 Usa `MultimodalGenerationAdapter` cuando el modelo deba analizar bytes de imagen
