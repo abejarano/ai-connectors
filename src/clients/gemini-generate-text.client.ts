@@ -1,6 +1,6 @@
 import { type GenerateContentConfig, GoogleGenAI } from "@google/genai"
-import { createTextTransportError, resolveStatusCode } from "../errors"
 import type { TextTransportError } from "../errors"
+import { createTextTransportError, resolveStatusCode } from "../errors"
 import { normalizeTokenUsage, toPlainObject } from "../helpers"
 import type { AIProviderConfigEntry } from "../types"
 import type {
@@ -27,6 +27,10 @@ export class GeminiGenerateTextClient implements TextGenerationClient {
     this.ai = new GoogleGenAI({
       apiKey: this.cfg.apiKey,
     })
+  }
+
+  get model(): string {
+    return this.cfg.model
   }
 
   async execute(

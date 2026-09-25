@@ -1,9 +1,9 @@
+import type { TextTransportError } from "../errors"
 import {
   createTextTransportError,
   resolveStatusCode,
   UnsupportedTextGenerationCapabilityError,
 } from "../errors"
-import type { TextTransportError } from "../errors"
 import { normalizeTokenUsage, toPlainObject } from "../helpers"
 import type { AIProviderConfigEntry } from "../types"
 import type {
@@ -82,6 +82,10 @@ export class DeepSeekGenerateTextClient implements TextGenerationClient {
     private readonly fetchImpl: FetchImplementation = fetch
   ) {
     this.baseUrl = (cfg.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, "")
+  }
+
+  get model(): string {
+    return this.cfg.model
   }
 
   async execute(

@@ -1,8 +1,8 @@
 import { GeminiGenerateImageClient } from "../clients/gemini-generate-image.client"
 import { UnsupportedGenerationProviderError } from "../errors"
 import type {
-  ImageGenerationClient,
   ImageGenerationCapabilities,
+  ImageGenerationClient,
   ImageGenerationRequest,
   ImageGenerationResponse,
 } from "../types/image-generation.request"
@@ -21,6 +21,10 @@ export class ImageGenerationAdapter implements ImageGenerationClient {
       throw new UnsupportedGenerationProviderError("image", config.provider)
     }
     this.client = new GeminiGenerateImageClient(config)
+  }
+
+  get model(): string {
+    return this.client.model
   }
 
   get capabilities(): ImageGenerationCapabilities {

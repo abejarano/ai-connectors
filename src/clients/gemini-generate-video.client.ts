@@ -9,8 +9,8 @@ import { resolveStatusCode, VideoTransportError } from "../errors"
 import { toPlainObject } from "../helpers"
 import type { AIProviderConfigEntry } from "../types"
 import type {
-  VideoGenerationClient,
   VideoGenerationCapabilities,
+  VideoGenerationClient,
   VideoGenerationRequest,
   VideoGenerationResponse,
 } from "../types/video-generation.request"
@@ -33,6 +33,10 @@ export class GeminiGenerateVideoClient implements VideoGenerationClient {
     this.ai = new GoogleGenAI({
       apiKey: this.cfg.apiKey,
     })
+  }
+
+  get model(): string {
+    return this.cfg.model
   }
 
   async execute(

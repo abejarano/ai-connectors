@@ -34,6 +34,10 @@ export class TextGenerationAdapter implements TextGenerationClient {
     }
   }
 
+  get model(): string {
+    return this.client.model
+  }
+
   get capabilities(): TextGenerationCapabilities {
     return this.client.capabilities
   }

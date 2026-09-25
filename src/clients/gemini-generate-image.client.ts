@@ -1,4 +1,4 @@
-import { GoogleGenAI, type GenerateContentConfig } from "@google/genai"
+import { type GenerateContentConfig, GoogleGenAI } from "@google/genai"
 import { mkdirSync, writeFileSync } from "node:fs"
 import { dirname, extname, resolve } from "node:path"
 import { ImageTransportError, resolveStatusCode } from "../errors"
@@ -6,8 +6,8 @@ import { toPlainObject } from "../helpers"
 import { inspectImageAsset } from "../helpers/image-asset"
 import type { AIProviderConfigEntry } from "../types"
 import type {
-  ImageGenerationClient,
   ImageGenerationCapabilities,
+  ImageGenerationClient,
   ImageGenerationRequest,
   ImageGenerationResponse,
 } from "../types/image-generation.request"
@@ -25,6 +25,10 @@ export class GeminiGenerateImageClient implements ImageGenerationClient {
     this.ai = new GoogleGenAI({
       apiKey: this.cfg.apiKey,
     })
+  }
+
+  get model(): string {
+    return this.cfg.model
   }
 
   async execute(

@@ -1,8 +1,8 @@
 import { GeminiGenerateVideoClient } from "../clients/gemini-generate-video.client"
 import { UnsupportedGenerationProviderError } from "../errors"
 import type {
-  VideoGenerationClient,
   VideoGenerationCapabilities,
+  VideoGenerationClient,
   VideoGenerationRequest,
   VideoGenerationResponse,
 } from "../types/video-generation.request"
@@ -21,6 +21,10 @@ export class VideoGenerationAdapter implements VideoGenerationClient {
       throw new UnsupportedGenerationProviderError("video", config.provider)
     }
     this.client = new GeminiGenerateVideoClient(config)
+  }
+
+  get model(): string {
+    return this.client.model
   }
 
   get capabilities(): VideoGenerationCapabilities {

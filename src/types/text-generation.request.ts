@@ -68,5 +68,7 @@ export type TextGenerationResponse = {
 
 export interface TextGenerationClient {
   readonly capabilities: TextGenerationCapabilities
+  readonly model: string
+
   execute(context: TextGenerationRequest): Promise<TextGenerationResponse>
 }

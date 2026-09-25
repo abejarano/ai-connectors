@@ -1,5 +1,3 @@
-import type { TextRetryPolicy } from "./text-generation.request"
-
 export type VideoAssetRef = {
   kind: "file"
   path: string
@@ -37,5 +35,7 @@ export type VideoGenerationRequest = {
 
 export interface VideoGenerationClient {
   readonly capabilities: VideoGenerationCapabilities
+  readonly model: string
+
   execute(context: VideoGenerationRequest): Promise<VideoGenerationResponse>
 }

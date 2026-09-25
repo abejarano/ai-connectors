@@ -33,5 +33,7 @@ export type ImageGenerationRequest = {
 
 export interface ImageGenerationClient {
   readonly capabilities: ImageGenerationCapabilities
+  readonly model: string
+
   execute(context: ImageGenerationRequest): Promise<ImageGenerationResponse>
 }
