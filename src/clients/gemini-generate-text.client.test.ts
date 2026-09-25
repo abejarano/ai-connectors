@@ -156,6 +156,48 @@ describe("GeminiGenerateTextClient", () => {
       },
     ])
   })
+
+  test("requests a JSON object without a schema", async () => {
+    const generateContent = mock(async () => ({ text: '{"ok":true}' }))
+    const client = createClient(generateContent)
+
+    await client.execute({
+      systemPrompt: "System",
+      userPrompt: "User",
+      responseFormat: { type: "json_object" },
+    })
+
+    const [request] = generateContent.mock.calls[0] as unknown as [
+      { config: Record<string, unknown> },
+    ]
+    expect(request.config).toMatchObject({
+      responseMimeType: "application/json",
+    })
+    expect(request.config).not.toHaveProperty("responseJsonSchema")
+  })
+
+  test("forwards the schema for JSON Schema output", async () => {
+    const generateContent = mock(async () => ({ text: '{"ok":true}' }))
+    const client = createClient(generateContent)
+
+    await client.execute({
+      systemPrompt: "System",
+      userPrompt: "User",
+      responseFormat: {
+        type: "json_schema",
+        name: "result",
+        schema: { type: "object" },
+      },
+    })
+
+    const [request] = generateContent.mock.calls[0] as unknown as [
+      { config: Record<string, unknown> },
+    ]
+    expect(request.config).toMatchObject({
+      responseMimeType: "application/json",
+      responseJsonSchema: { type: "object" },
+    })
+  })
 })
 
 const createClient = (generateContent: ReturnType<typeof mock>) => {

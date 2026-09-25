@@ -76,6 +76,33 @@ describe("DeepSeekGenerateTextClient", () => {
     })
   })
 
+  test("guides JSON object output without a schema", async () => {
+    const fetchImpl = mock(async () =>
+      jsonResponse({
+        choices: [{ message: { content: '{"title":"DeepSeek"}' } }],
+      })
+    )
+    const client = createClient(fetchImpl)
+
+    await client.execute({
+      systemPrompt: "Return concise output.",
+      userPrompt: "Create a title.",
+      responseFormat: { type: "json_object" },
+    })
+
+    const [, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit]
+    expect(JSON.parse(String(init.body))).toMatchObject({
+      messages: [
+        {
+          role: "system",
+          content: "Return concise output.\n\nReturn only a JSON object.",
+        },
+        { role: "user", content: "Create a title." },
+      ],
+      response_format: { type: "json_object" },
+    })
+  })
+
   test("returns DeepSeek function tool calls in the neutral response", async () => {
     const fetchImpl = mock(async () =>
       jsonResponse({

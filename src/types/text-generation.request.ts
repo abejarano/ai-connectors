@@ -1,11 +1,15 @@
 import type { TextUsage } from "./index"
 
-export type StructuredOutputFormat = {
-  type: "json_schema"
-  name: string
-  schema: Record<string, unknown>
-  strict?: boolean
-}
+export type StructuredOutputFormat =
+  | {
+      type: "json_object"
+    }
+  | {
+      type: "json_schema"
+      name: string
+      schema: Record<string, unknown>
+      strict?: boolean
+    }
 
 export type TextFunctionTool = {
   type: "function"

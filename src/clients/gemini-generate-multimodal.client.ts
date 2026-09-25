@@ -76,12 +76,20 @@ export class GeminiGenerateMultimodalClient implements MultimodalGenerationClien
   private buildRequestConfig(
     context: MultimodalGenerationRequest
   ): GenerateContentConfig {
-    return {
+    const config: GenerateContentConfig = {
       abortSignal: context.signal,
       systemInstruction: context.systemPrompt.trim(),
       maxOutputTokens: context.maxOutputTokens,
-      responseMimeType: context.responseFormat ? "application/json" : undefined,
-      responseJsonSchema: context.responseFormat?.schema,
     }
+
+    if (context.responseFormat) {
+      config.responseMimeType = "application/json"
+
+      if (context.responseFormat.type === "json_schema") {
+        config.responseJsonSchema = context.responseFormat.schema
+      }
+    }
+
+    return config
   }
 }

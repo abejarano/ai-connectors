@@ -50,7 +50,10 @@ export class DeepSeekGenerateMultimodalClient implements MultimodalGenerationCli
   async execute(
     context: MultimodalGenerationRequest
   ): Promise<TextGenerationResponse> {
-    if (context.responseFormat?.strict) {
+    if (
+      context.responseFormat?.type === "json_schema" &&
+      context.responseFormat.strict
+    ) {
       throw new UnsupportedTextGenerationCapabilityError(
         "strict_json_schema",
         "deepseek"
