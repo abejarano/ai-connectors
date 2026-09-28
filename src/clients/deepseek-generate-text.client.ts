@@ -249,9 +249,15 @@ export class DeepSeekGenerateTextClient implements TextGenerationClient {
       NonNullable<TextGenerationRequest["reasoning"]>["effort"]
     >
   ): "none" | "low" | "high" | "max" {
-    if (effort === "none" || effort === "low" || effort === "max") {
+    if (
+      effort === "none" ||
+      effort === "low" ||
+      effort === "high" ||
+      effort === "max"
+    ) {
       return effort
     }
+
     return "high"
   }
 
