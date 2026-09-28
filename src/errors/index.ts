@@ -89,7 +89,54 @@ export class ProviderError extends Error {
   }
 }
 
-export class TextTransportError extends ProviderError {
+/**
+ * Brand shared by every transport error.
+ *
+ * `Symbol.for` is global, so the brand survives the case where two copies of
+ * this package live in different `node_modules` trees and therefore do not share
+ * class identity.
+ */
+const TRANSPORT_ERROR_BRAND = Symbol.for(
+  "@abejarano/ai-connectors/transport-error"
+)
+
+type BrandedTransportError = { [TRANSPORT_ERROR_BRAND]?: unknown }
+
+/**
+ * Base class of every provider transport failure (text, image and video).
+ *
+ * It exists so callers can answer "did the provider fail?" structurally, with
+ * no error codes, class names or message matching.
+ */
+export class TransportError extends ProviderError {
+  constructor(
+    message: string,
+    code: string,
+    details?: Record<string, unknown>
+  ) {
+    super(message, code, details)
+    ;(this as BrandedTransportError)[TRANSPORT_ERROR_BRAND] = true
+  }
+}
+
+/**
+ * `true` only for transport failures: connection, timeout, HTTP status, auth,
+ * rate limit or an aborted request. Capability and provider-configuration
+ * errors are not transport errors.
+ */
+export const isTransportError = (error: unknown): error is TransportError => {
+  if (error instanceof TransportError) {
+    return true
+  }
+
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as BrandedTransportError)[TRANSPORT_ERROR_BRAND] === true
+  )
+}
+
+export class TextTransportError extends TransportError {
   constructor(message: string, details?: Record<string, unknown>) {
     super(message, "text_transport_error", details)
   }
@@ -118,8 +165,7 @@ export class UnsupportedGenerationProviderError extends ProviderError {
   }
 }
 
-export class ImageTransportError extends Error {
-  readonly code = "image_transport_error"
+export class ImageTransportError extends TransportError {
   readonly statusCode?: number
   readonly raw?: unknown
 
@@ -127,15 +173,16 @@ export class ImageTransportError extends Error {
     message: string,
     input: { statusCode?: number; raw?: unknown } = {}
   ) {
-    super(message)
-    this.name = "ImageTransportError"
+    super(message, "image_transport_error", {
+      statusCode: input.statusCode,
+      raw: input.raw,
+    })
     this.statusCode = input.statusCode
     this.raw = input.raw
   }
 }
 
-export class VideoTransportError extends Error {
-  readonly code = "video_transport_error"
+export class VideoTransportError extends TransportError {
   readonly statusCode?: number
   readonly raw?: unknown
 
@@ -143,8 +190,10 @@ export class VideoTransportError extends Error {
     message: string,
     input: { statusCode?: number; raw?: unknown } = {}
   ) {
-    super(message)
-    this.name = "VideoTransportError"
+    super(message, "video_transport_error", {
+      statusCode: input.statusCode,
+      raw: input.raw,
+    })
     this.statusCode = input.statusCode
     this.raw = input.raw
   }

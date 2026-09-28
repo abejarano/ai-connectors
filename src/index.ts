@@ -41,8 +41,10 @@ export type {
 } from "./types/multimodal-generation.request"
 
 export {
+  TransportError,
   UnsupportedGenerationProviderError,
   UnsupportedTextGenerationCapabilityError,
+  isTransportError,
 } from "./errors"
 
 export type {
