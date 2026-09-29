@@ -1,6 +1,6 @@
 import { type GenerateContentConfig, GoogleGenAI } from "@google/genai"
 import { createTextTransportError, resolveStatusCode } from "../errors"
-import { toPlainObject } from "../helpers"
+import { normalizeTokenUsage, toPlainObject } from "../helpers"
 import type { AIProviderConfigEntry } from "../types"
 import type {
   MultimodalGenerationCapabilities,
@@ -53,7 +53,10 @@ export class GeminiGenerateMultimodalClient implements MultimodalGenerationClien
         config: this.buildRequestConfig(context),
       })
 
-      return { text: response.text?.trim() || "" }
+      return {
+        text: response.text?.trim() || "",
+        usage: normalizeTokenUsage(response.usageMetadata),
+      }
     } catch (error) {
       const message =
         error instanceof Error

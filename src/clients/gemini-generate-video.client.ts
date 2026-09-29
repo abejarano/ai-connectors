@@ -123,6 +123,7 @@ export class GeminiGenerateVideoClient implements VideoGenerationClient {
 
     const generatedVideo =
       resolvedOperation.response?.generatedVideos?.[0]?.video
+    const videoCount = resolvedOperation.response?.generatedVideos?.length ?? 0
 
     if (!generatedVideo) {
       throw new VideoTransportError(
@@ -170,6 +171,13 @@ export class GeminiGenerateVideoClient implements VideoGenerationClient {
       mimeType,
       sizeBytes: fileInfo.size,
       durationSeconds,
+      // Los modelos de vídeo se facturan por segundo generado: exponemos las
+      // unidades necesarias para que el consumidor aplique su tarifa.
+      usage: {
+        videoCount,
+        durationSeconds,
+        resolution,
+      },
     }
   }
 

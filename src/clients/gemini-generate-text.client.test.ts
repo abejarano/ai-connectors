@@ -198,6 +198,39 @@ describe("GeminiGenerateTextClient", () => {
       responseJsonSchema: { type: "object" },
     })
   })
+
+  test("keeps the usage reported by an intermediate stream chunk", async () => {
+    const generateContent = mock(async () => undefined)
+    const generateContentStream = mock(async () => {
+      return (async function* () {
+        yield {
+          text: "Hello",
+          usageMetadata: {
+            promptTokenCount: 12,
+            candidatesTokenCount: 4,
+            totalTokenCount: 16,
+          },
+        }
+        // El chunk final de Gemini no siempre repite usageMetadata.
+        yield { text: " world" }
+      })()
+    })
+    const client = createClient(generateContent)
+    ;(client as unknown as { ai: { models: unknown } }).ai = {
+      models: { generateContent, generateContentStream },
+    }
+
+    const result = await client.execute({
+      systemPrompt: "System",
+      userPrompt: "User",
+      stream: true,
+    })
+
+    expect(result.text).toBe("Hello world")
+    expect(result.usage?.inputTokens).toBe(12)
+    expect(result.usage?.outputTokens).toBe(4)
+    expect(result.usage?.totalTokens).toBe(16)
+  })
 })
 
 const createClient = (generateContent: ReturnType<typeof mock>) => {

@@ -1,4 +1,4 @@
-import type { TextUsage } from "./index"
+import type { TokenUsage } from "./usage"
 
 export type StructuredOutputFormat =
   | {
@@ -66,7 +66,7 @@ export type TextGenerationRequest = {
 
 export type TextGenerationResponse = {
   text: string
-  usage?: TextUsage
+  usage?: TokenUsage
   toolCalls?: TextToolCall[]
 }
 

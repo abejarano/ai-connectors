@@ -85,3 +85,40 @@ test("requests a JSON object without a schema", async () => {
   ]
   expect(request.config).not.toHaveProperty("responseJsonSchema")
 })
+
+test("returns the normalized token usage reported by Gemini", async () => {
+  const generateContent = mock(async () => ({
+    text: "descripción",
+    usageMetadata: {
+      promptTokenCount: 120,
+      cachedContentTokenCount: 20,
+      candidatesTokenCount: 15,
+      thoughtsTokenCount: 5,
+      totalTokenCount: 140,
+    },
+  }))
+  const client = new GeminiGenerateMultimodalClient({
+    apiKey: "test-key",
+    model: "gemini-test",
+  })
+  ;(client as unknown as { ai: { models: unknown } }).ai = {
+    models: { generateContent },
+  }
+
+  const result = await client.execute({
+    systemPrompt: "system",
+    userPrompt: "user",
+    images: [{ bytes: new Uint8Array([1, 2, 3]), mimeType: "image/png" }],
+  })
+
+  expect(result.text).toBe("descripción")
+  expect(result.usage?.inputTokens).toBe(120)
+  expect(result.usage?.cachedInputTokens).toBe(20)
+  expect(result.usage?.outputTokens).toBe(20)
+  expect(result.usage?.reasoningTokens).toBe(5)
+  expect(result.usage?.totalTokens).toBe(140)
+  expect(result.usage?.raw).toBeDefined()
+  expect(result.usage!.inputTokens! + result.usage!.outputTokens!).toBe(
+    result.usage!.totalTokens!
+  )
+})

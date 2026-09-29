@@ -9,6 +9,7 @@ Paquete TypeScript para integrar proveedores de IA mediante adapters neutrales d
 - Generación de texto DeepSeek mediante su API de Chat Completions
 - Generación de imágenes con persistencia en archivo
 - Generación de video con polling configurable
+- Consumo normalizado de tokens y unidades facturables en texto, multimodal, imagen y vídeo
 - Errores de transporte normalizados con información de retry
 - Selección explícita de proveedor sin dependencias de clientes concretos
 
@@ -56,6 +57,10 @@ El export raíz del paquete publica actualmente:
 - `TextGenerationCapabilities`
 - `StructuredOutputFormat`
 - `TextRetryPolicy`
+- `TokenUsage`
+- `ImageUsage`
+- `VideoUsage`
+- `VideoResolution`
 
 ## Uso
 
@@ -255,6 +260,104 @@ const result = await client.execute({
 console.log(result.asset.path)
 console.log(result.mimeType)
 console.log(result.durationSeconds)
+```
+
+## Consumo de tokens y coste
+
+Toda respuesta, sea de texto, multimodal, imagen o vídeo, incluye un `usage`
+normalizado y agnóstico del proveedor.
+
+### Qué expone cada adapter
+
+| Adapter            | Campos de `usage`                             | Unidades               |
+| ------------------ | --------------------------------------------- | ---------------------- |
+| Texto y multimodal | `inputTokens`, `outputTokens`, `totalTokens`  | tokens                 |
+| Texto y multimodal | `cachedInputTokens`, `reasoningTokens`        | subconjuntos de tokens |
+| Imagen             | `imageCount`, `tokens`                        | imágenes y tokens      |
+| Vídeo              | `videoCount`, `durationSeconds`, `resolution` | segundos facturables   |
+
+Contrato de los campos de tokens:
+
+- `inputTokens` es todo lo facturable como entrada: incluye el contenido
+  cacheado y los resultados de herramientas.
+- `cachedInputTokens` es un subconjunto de `inputTokens`; el input a tarifa
+  completa es `inputTokens - cachedInputTokens`.
+- `outputTokens` es todo lo facturable como salida: incluye el razonamiento.
+- `reasoningTokens` es un subconjunto de `outputTokens`.
+- `totalTokens` es el total declarado por el proveedor y coincide con
+  `inputTokens + outputTokens`.
+- `raw` conserva el payload original del proveedor por si necesitas un desglose
+  que la normalización no cubra.
+
+Los subconjuntos nunca se suman dos veces: si sólo te interesa el gasto total,
+`inputTokens` y `outputTokens` ya contienen todo lo facturable.
+
+Cómo se construyen esos totales según el proveedor, porque no reportan igual:
+
+- **Gemini** deja los _thoughts_ fuera de `candidatesTokenCount` y los resultados
+  de herramientas fuera de `promptTokenCount`, pero los factura y los suma en
+  `totalTokenCount`. La normalización los incorpora a `outputTokens` e
+  `inputTokens` respectivamente; `reasoningTokens` conserva el desglose.
+- **DeepSeek** ya incluye el razonamiento dentro de `completion_tokens` (su
+  `completion_tokens_details` es un desglose, no un sumando), así que
+  `outputTokens` lo contiene sin sumarlo otra vez.
+
+```ts
+const result = await client.execute({
+  systemPrompt: "Responde de forma breve.",
+  userPrompt: "Escribe un titular.",
+})
+
+console.log(result.usage?.inputTokens, result.usage?.outputTokens)
+```
+
+### La librería no calcula el precio
+
+Los precios cambian, dependen del contrato de cada cuenta y algunos proveedores
+los aplican por franja horaria. Por eso el paquete **devuelve unidades
+facturables y nunca las traduce a dinero**: el cálculo es responsabilidad de
+cada consumidor, con sus propias tarifas. `usage.estimatedCostUsd` existe
+únicamente como hueco para que adjuntes tu resultado; la librería nunca lo
+escribe.
+
+Ejemplo con las tarifas publicadas de DeepSeek, que distinguen caché y franja
+horaria ([precios oficiales](https://api-docs.deepseek.com/quick_start/pricing)):
+
+```ts
+const result = await client.execute({ systemPrompt, userPrompt })
+const usage = result.usage
+
+if (usage) {
+  const cacheHit = usage.cachedInputTokens ?? 0
+  const cacheMiss = (usage.inputTokens ?? 0) - cacheHit
+  const output = usage.outputTokens ?? 0
+  const isPeak = isDeepSeekPeakHour(new Date()) // 01:00-04:00 y 06:00-10:00 UTC, L-V
+
+  const cacheHitUsd = isPeak ? 0.006 : 0.003 // por 1M tokens
+  const cacheMissUsd = isPeak ? 0.3 : 0.15
+  const outputUsd = isPeak ? 1.2 : 0.6
+
+  usage.estimatedCostUsd =
+    (cacheHit * cacheHitUsd + cacheMiss * cacheMissUsd + output * outputUsd) /
+    1_000_000
+}
+```
+
+En vídeo el proveedor factura por segundo generado, así que las unidades ya
+vienen separadas de los tokens:
+
+```ts
+const result = await videoClient.execute({
+  prompt: "Un plano cinematográfico de una ciudad al amanecer.",
+  outputPath: "./output/video.mp4",
+  width: 1080,
+  height: 1920,
+})
+
+if (result.usage) {
+  result.usage.estimatedCostUsd =
+    result.usage.videoCount * result.usage.durationSeconds * PRICE_PER_SECOND
+}
 ```
 
 ## Manejo de errores

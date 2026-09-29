@@ -29,6 +29,40 @@ test("maps image bytes to DeepSeek vision content without a response format", as
   expect(body).not.toHaveProperty("response_format")
 })
 
+test("returns the token usage reported for the vision request", async () => {
+  const fetchImpl = mock(async () =>
+    jsonResponse({
+      choices: [{ message: { content: '{"plan":true}' } }],
+      usage: {
+        prompt_tokens: 900,
+        completion_tokens: 40,
+        total_tokens: 940,
+        prompt_tokens_details: { cached_tokens: 128 },
+      },
+    })
+  )
+  const client = createClient(fetchImpl)
+
+  const result = await client.execute({
+    systemPrompt: "system",
+    userPrompt: "user",
+    images: [image],
+  })
+
+  expect(result.usage).toEqual({
+    inputTokens: 900,
+    cachedInputTokens: 128,
+    outputTokens: 40,
+    totalTokens: 940,
+    raw: {
+      prompt_tokens: 900,
+      completion_tokens: 40,
+      total_tokens: 940,
+      prompt_tokens_details: { cached_tokens: 128 },
+    },
+  })
+})
+
 test("guides JSON object output with json_object", async () => {
   const fetchImpl = mock(async () =>
     jsonResponse({ choices: [{ message: { content: '{"plan":true}' } }] })

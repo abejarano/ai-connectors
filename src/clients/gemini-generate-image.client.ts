@@ -2,7 +2,7 @@ import { type GenerateContentConfig, GoogleGenAI } from "@google/genai"
 import { mkdirSync, writeFileSync } from "node:fs"
 import { dirname, extname, resolve } from "node:path"
 import { ImageTransportError, resolveStatusCode } from "../errors"
-import { toPlainObject } from "../helpers"
+import { normalizeTokenUsage, toPlainObject } from "../helpers"
 import { inspectImageAsset } from "../helpers/image-asset"
 import type { AIProviderConfigEntry } from "../types"
 import type {
@@ -76,7 +76,17 @@ export class GeminiGenerateImageClient implements ImageGenerationClient {
       sizeBytes: assetInfo.sizeBytes,
       width: assetInfo.width,
       height: assetInfo.height,
+      usage: {
+        imageCount: generated.imageCount,
+        tokens: normalizeTokenUsage(this.readUsageMetadata(response)),
+      },
     }
+  }
+
+  private readUsageMetadata(response: unknown): unknown {
+    if (!response || typeof response !== "object") return undefined
+
+    return (response as { usageMetadata?: unknown }).usageMetadata
   }
 
   private detectMimeFromPath(path: string): string {
@@ -121,6 +131,7 @@ export class GeminiGenerateImageClient implements ImageGenerationClient {
   private resolveGeneratedImageFromContent(response: unknown): {
     bytesBase64: string
     mimeType?: string
+    imageCount: number
   } {
     if (!response || typeof response !== "object") {
       throw new ImageTransportError(
@@ -141,11 +152,14 @@ export class GeminiGenerateImageClient implements ImageGenerationClient {
       }>
     }
 
-    const imagePart = responseData.candidates?.[0]?.content?.parts?.find(
-      (part) =>
-        typeof part.inlineData?.data === "string" && part.inlineData.data.trim()
-    )
+    const imageParts =
+      responseData.candidates?.[0]?.content?.parts?.filter(
+        (part) =>
+          typeof part.inlineData?.data === "string" &&
+          Boolean(part.inlineData.data.trim())
+      ) ?? []
 
+    const imagePart = imageParts[0]
     const bytesBase64 = imagePart?.inlineData?.data
 
     if (!bytesBase64?.trim()) {
@@ -158,6 +172,7 @@ export class GeminiGenerateImageClient implements ImageGenerationClient {
     return {
       bytesBase64,
       mimeType: imagePart?.inlineData?.mimeType,
+      imageCount: imageParts.length,
     }
   }
 
