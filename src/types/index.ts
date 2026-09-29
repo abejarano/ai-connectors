@@ -1,11 +1,12 @@
-export type TextUsage = {
-  inputTokens?: number
-  outputTokens?: number
-  totalTokens?: number
-  cachedInputTokens?: number
-  estimatedCostUsd?: number
-  raw?: unknown
-}
+export type {
+  ImageUsage,
+  TokenUsage,
+  VideoResolution,
+  VideoUsage,
+} from "./usage"
+
+/** @deprecated usa `TokenUsage`. */
+export type { TokenUsage as TextUsage } from "./usage"
 
 export type AIExecutionMeta = {
   model?: string

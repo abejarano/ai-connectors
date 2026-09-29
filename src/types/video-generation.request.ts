@@ -1,3 +1,5 @@
+import type { VideoUsage } from "./usage"
+
 export type VideoAssetRef = {
   kind: "file"
   path: string
@@ -8,6 +10,7 @@ export type VideoGenerationResponse = {
   mimeType: string
   sizeBytes: number
   durationSeconds: number
+  usage?: VideoUsage
 }
 
 export type VideoGenerationCapabilities = {

@@ -1,4 +1,5 @@
 import type { TextRetryPolicy } from "./text-generation.request"
+import type { ImageUsage } from "./usage"
 
 export type ImageAssetRef = {
   kind: "file"
@@ -11,6 +12,7 @@ export type ImageGenerationResponse = {
   sizeBytes: number
   width: number
   height: number
+  usage?: ImageUsage
 }
 
 export type ImageGenerationCapabilities = {

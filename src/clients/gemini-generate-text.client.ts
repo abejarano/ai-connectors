@@ -101,9 +101,19 @@ export class GeminiGenerateTextClient implements TextGenerationClient {
 
       let fullText = ""
       let lastChunk: unknown = undefined
+      let usageSource: unknown = undefined
 
       for await (const chunk of stream) {
         lastChunk = chunk
+
+        const chunkUsageMetadata =
+          chunk && typeof chunk === "object"
+            ? (chunk as { usageMetadata?: unknown }).usageMetadata
+            : undefined
+        // Gemini reporta el consumo acumulado en cada chunk, pero el último no
+        // siempre lo incluye: conservamos el último valor informado.
+        if (chunkUsageMetadata) usageSource = chunkUsageMetadata
+
         const textChunk =
           chunk && typeof chunk === "object"
             ? ((chunk as { text?: unknown }).text as string | undefined)
@@ -117,10 +127,6 @@ export class GeminiGenerateTextClient implements TextGenerationClient {
         }
       }
 
-      const usageSource =
-        lastChunk && typeof lastChunk === "object"
-          ? (lastChunk as { usageMetadata?: unknown }).usageMetadata
-          : undefined
       const fallbackText =
         lastChunk && typeof lastChunk === "object"
           ? (lastChunk as { text?: unknown }).text

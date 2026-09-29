@@ -3,7 +3,7 @@ import {
   resolveStatusCode,
   UnsupportedTextGenerationCapabilityError,
 } from "../errors"
-import { toPlainObject } from "../helpers"
+import { normalizeTokenUsage, toPlainObject } from "../helpers"
 import type { AIProviderConfigEntry } from "../types"
 import type {
   MultimodalGenerationCapabilities,
@@ -105,8 +105,12 @@ export class DeepSeekGenerateMultimodalClient implements MultimodalGenerationCli
 
       const payload = (await response.json()) as {
         choices?: Array<{ message?: { content?: string | null } }>
+        usage?: unknown
       }
-      return { text: payload.choices?.[0]?.message?.content?.trim() ?? "" }
+      return {
+        text: payload.choices?.[0]?.message?.content?.trim() ?? "",
+        usage: normalizeTokenUsage(payload.usage),
+      }
     } catch (error) {
       const message =
         error instanceof Error

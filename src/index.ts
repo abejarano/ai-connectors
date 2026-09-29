@@ -39,6 +39,12 @@ export type {
   MultimodalGenerationRequest,
   MultimodalInputImage,
 } from "./types/multimodal-generation.request"
+export type {
+  ImageUsage,
+  TokenUsage,
+  VideoResolution,
+  VideoUsage,
+} from "./types/usage"
 
 export {
   TransportError,
