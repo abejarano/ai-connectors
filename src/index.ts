@@ -17,11 +17,13 @@ export {
 
 export type {
   ImageAssetRef,
+  ImageEditRequest,
   ImageGenerationCapabilities,
   ImageGenerationClient,
   ImageGenerationRequest,
   ImageGenerationResponse,
 } from "./types/image-generation.request"
+export type { ImageInput } from "./types/image-input"
 export type {
   StructuredOutputFormat,
   TextFunctionTool,
@@ -47,8 +49,10 @@ export type {
 } from "./types/usage"
 
 export {
+  InvalidImageInputError,
   TransportError,
   UnsupportedGenerationProviderError,
+  UnsupportedImageEditCapabilityError,
   UnsupportedTextGenerationCapabilityError,
   isTransportError,
 } from "./errors"

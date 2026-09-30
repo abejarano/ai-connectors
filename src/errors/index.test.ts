@@ -1,10 +1,12 @@
 import { describe, expect, test } from "bun:test"
 import {
   ImageTransportError,
+  InvalidImageInputError,
   ProviderError,
   TextTransportError,
   TransportError,
   UnsupportedGenerationProviderError,
+  UnsupportedImageEditCapabilityError,
   UnsupportedTextGenerationCapabilityError,
   VideoTransportError,
   createTextTransportError,
@@ -31,6 +33,18 @@ describe("isTransportError", () => {
     ).toBe(false)
     expect(
       isTransportError(new UnsupportedGenerationProviderError("text", "x"))
+    ).toBe(false)
+    expect(
+      isTransportError(
+        new UnsupportedImageEditCapabilityError({
+          provider: "gemini",
+          model: "imagen-3.0-generate-002",
+          reason: "not an image-editing model",
+        })
+      )
+    ).toBe(false)
+    expect(
+      isTransportError(new InvalidImageInputError("'bytes' is empty"))
     ).toBe(false)
     expect(isTransportError(new ProviderError("boom", "some_code"))).toBe(false)
   })

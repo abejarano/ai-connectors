@@ -8,6 +8,7 @@ Paquete TypeScript para integrar proveedores de IA mediante adapters neutrales d
 - Salida estructurada con JSON Schema
 - Generación de texto DeepSeek mediante su API de Chat Completions
 - Generación de imágenes con persistencia en archivo
+- Edición de imágenes existentes (image-to-image) con `edit()`
 - Generación de video con polling configurable
 - Consumo normalizado de tokens y unidades facturables en texto, multimodal, imagen y vídeo
 - Errores de transporte normalizados con información de retry
@@ -48,6 +49,8 @@ El export raíz del paquete publica actualmente:
 - `TextGenerationClient`
 - `ImageGenerationResponse`
 - `ImageGenerationRequest`
+- `ImageEditRequest`
+- `ImageInput`
 - `ImageGenerationClient`
 - `ImageGenerationCapabilities`
 - `VideoGenerationResponse`
@@ -236,6 +239,121 @@ console.log(result.mimeType)
 console.log(result.width, result.height)
 ```
 
+### Edición de imágenes (image-to-image)
+
+`edit()` es una operación distinta de `execute()`, con su propio método: le das
+una imagen existente **como base de la edición** y una instrucción, y el modelo
+genera una versión transformada a partir de ella, no una imagen nueva desde
+cero. Mantenerlas separadas evita un contrato ambiguo en el que no se sabe si
+`inputImages` significa "edita esto" o "inspírate en esto".
+
+> **Qué garantiza y qué no.** El proveedor acepta la imagen de entrada y la usa
+> como base, pero **preservar el sujeto, la geometría o la escena no es una
+> garantía contractual del modelo**: depende del modelo y de la instrucción, y es
+> justo lo que conviene medir en cada caso de uso antes de confiar en él.
+
+```ts
+import { ImageGenerationAdapter } from "@abejarano/ai-connectors"
+import { readFileSync } from "node:fs"
+
+const client = new ImageGenerationAdapter({
+  provider: "gemini",
+  apiKey: process.env.GEMINI_API_KEY!,
+  model: "gemini-3-pro-image",
+})
+
+const result = await client.edit({
+  image: {
+    bytes: readFileSync("./input/industrial-base.jpg"),
+    mimeType: "image/jpeg",
+  },
+  prompt: [
+    "Preserva al técnico, la bomba, el manómetro y la escena.",
+    "Transforma esta fotografía en un key visual de campaña industrial:",
+    "más dirección gráfica, palette navy + orange, framing editorial,",
+    "profundidad, área diseñada para headline, sin texto ni logo.",
+  ].join(" "),
+  outputPath: "./output/key-visual.png",
+})
+
+console.log(result.asset.path)
+console.log(result.mimeType)
+console.log(result.usage?.imageCount)
+```
+
+`edit()` devuelve el mismo `ImageGenerationResponse` que `execute()`, así que el
+asset, el MIME, las dimensiones y el `usage` se leen igual en ambos casos.
+
+Detalles del contrato:
+
+- **Los bytes y el MIME viajan tal cual.** La librería no recodifica la imagen:
+  sólo la codifica en base64 para el transporte. El `mimeType` se declara de
+  forma explícita porque el proveedor no lo adivina a partir de los bytes.
+- **Una imagen de entrada**, obligatoria. Un `bytes` vacío o un `mimeType` en
+  blanco se rechazan con `InvalidImageInputError` **antes** de llamar al
+  proveedor, en lugar de enviar una petición corrupta.
+- **Sin `imageConfig`.** No se fuerza encuadre ni aspect ratio: se deja que el
+  modelo lo decida a partir de la imagen de entrada, en vez de imponerle uno que
+  compita con la instrucción. Por eso `edit()` no acepta `width`/`height`.
+- **`outputPath` es obligatorio**, igual que en `execute()`, porque el resultado
+  se persiste en disco y se devuelve como `asset`.
+
+> ⚠️ **Defecto conocido, pendiente de un PR de seguimiento: la extensión de
+> `outputPath` puede no coincidir con el formato real de los bytes.**
+>
+> El proveedor decide el formato de salida y la librería escribe los bytes tal
+> cual en la ruta que le pases. Si pides `.png` y el modelo devuelve JPEG,
+> obtienes bytes JPEG dentro de un fichero `.png`, sin ningún aviso.
+>
+> Está verificado con `gemini-3-pro-image`, que devuelve `image/jpeg`, y afecta
+> por igual a `execute()` y a `edit()`, porque la persistencia es compartida. Es
+> un defecto **preexistente**, no introducido por `edit()`.
+>
+> **Hoy no hay workaround en la librería, a propósito**: no se renombra
+> `outputPath`, no se recodifica la imagen y no se infiere que `.png` signifique
+> "convertir a PNG". `result.mimeType` es la fuente de verdad del formato, así que
+> compruébalo y nombra el fichero en consecuencia.
+>
+> El arreglo previsto compara el MIME del proveedor con la extensión solicitada y
+> falla con un error explícito **antes de escribir**, incluyendo la extensión
+> pedida, el MIME del proveedor y el modelo. Se aplicará de forma consistente a
+> `execute()` y a `edit()`.
+
+- **Sólo `signal`.** `edit()` no expone `timeoutMs` ni `retryPolicy` porque hoy
+  no los aplica: prometerlos daría una falsa sensación de acotar la llamada. Para
+  acotarla, pasa tu propio `AbortSignal`.
+
+#### Capability y modelos
+
+`capabilities.imageEdit` **no es una constante del proveedor: depende del
+modelo**, así que se evalúa sobre la instancia:
+
+```ts
+if (client.capabilities.imageEdit) {
+  await client.edit({ image, prompt, outputPath })
+}
+```
+
+La librería sólo marca `imageEdit: true` para modelos verificados
+(`gemini-3-pro-image`, `gemini-3.1-flash-image`, `gemini-3.1-flash-lite-image`,
+`gemini-2.5-flash-image`). Con cualquier otro modelo **`edit()` falla con
+`UnsupportedImageEditCapabilityError` y no llama al proveedor**: nunca se degrada
+en silencio a text-to-image, porque eso devolvería una imagen plausible y
+equivocada. Es un error de capacidad, así que `isTransportError()` devuelve
+`false` y no se reintenta.
+
+Si has verificado que otro modelo respeta la imagen de entrada, actívalo de forma
+explícita:
+
+```ts
+const client = new ImageGenerationAdapter({
+  provider: "gemini",
+  apiKey: process.env.GEMINI_API_KEY!,
+  model: "gemini-modelo-nuevo",
+  allowUnverifiedImageEdit: true,
+})
+```
+
 ### Generación de video
 
 La generación de vídeo está disponible actualmente sólo con `provider: "gemini"`.
@@ -369,6 +487,13 @@ El paquete normaliza los fallos del proveedor para que el consumidor pueda reacc
 - `VideoTransportError`
 - `UnsupportedGenerationProviderError`
 - `UnsupportedTextGenerationCapabilityError`
+- `UnsupportedImageEditCapabilityError`
+- `InvalidImageInputError`
+
+Los errores de transporte (`TextTransportError`, `ImageTransportError`,
+`VideoTransportError`) se reconocen con `isTransportError()`, que devuelve
+`false` para los errores de capacidad y de configuración: si no es un fallo de
+transporte, reintentar no sirve de nada.
 
 En texto, el error expone un `retryable` en los detalles cuando el fallo parece transitorio.
 

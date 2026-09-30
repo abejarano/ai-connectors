@@ -165,6 +165,39 @@ export class UnsupportedGenerationProviderError extends ProviderError {
   }
 }
 
+/**
+ * El proveedor o el modelo no soportan editar una imagen existente.
+ *
+ * Es un error de capacidad, no de transporte: no se reintenta y nunca se
+ * resuelve degradando la llamada a text-to-image.
+ */
+export class UnsupportedImageEditCapabilityError extends ProviderError {
+  constructor(input: { provider: string; model: string; reason: string }) {
+    super(
+      `Provider '${input.provider}' cannot edit images with model '${input.model}': ${input.reason}.`,
+      "image_edit_unsupported",
+      {
+        capability: "imageEdit",
+        provider: input.provider,
+        model: input.model,
+        reason: input.reason,
+      }
+    )
+  }
+}
+
+/**
+ * La imagen de entrada no es utilizable tal cual llegó, así que se rechaza
+ * antes de llamar al proveedor en lugar de enviar bytes corruptos.
+ */
+export class InvalidImageInputError extends ProviderError {
+  constructor(reason: string) {
+    super(`Image input is invalid: ${reason}.`, "image_input_invalid", {
+      reason,
+    })
+  }
+}
+
 export class ImageTransportError extends TransportError {
   readonly statusCode?: number
   readonly raw?: unknown

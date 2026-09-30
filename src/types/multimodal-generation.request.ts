@@ -1,12 +1,11 @@
+import type { ImageInput } from "./image-input"
 import type {
   StructuredOutputFormat,
   TextGenerationResponse,
 } from "./text-generation.request"
 
-export type MultimodalInputImage = {
-  bytes: Uint8Array
-  mimeType: string
-}
+/** @deprecated usa `ImageInput`. */
+export type MultimodalInputImage = ImageInput
 
 export type MultimodalGenerationRequest = {
   systemPrompt: string

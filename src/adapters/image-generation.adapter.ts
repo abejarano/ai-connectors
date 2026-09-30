@@ -1,6 +1,7 @@
 import { GeminiGenerateImageClient } from "../clients/gemini-generate-image.client"
 import { UnsupportedGenerationProviderError } from "../errors"
 import type {
+  ImageEditRequest,
   ImageGenerationCapabilities,
   ImageGenerationClient,
   ImageGenerationRequest,
@@ -11,6 +12,11 @@ export type ImageGenerationAdapterConfig = {
   provider: "gemini"
   apiKey: string
   model: string
+  /**
+   * Habilita `edit()` con modelos de imagen no verificados. Se propaga al
+   * cliente del proveedor.
+   */
+  allowUnverifiedImageEdit?: boolean
 }
 
 export class ImageGenerationAdapter implements ImageGenerationClient {
@@ -33,5 +39,9 @@ export class ImageGenerationAdapter implements ImageGenerationClient {
 
   execute(context: ImageGenerationRequest): Promise<ImageGenerationResponse> {
     return this.client.execute(context)
+  }
+
+  edit(context: ImageEditRequest): Promise<ImageGenerationResponse> {
+    return this.client.edit(context)
   }
 }

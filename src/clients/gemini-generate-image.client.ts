@@ -1,27 +1,51 @@
 import { type GenerateContentConfig, GoogleGenAI } from "@google/genai"
 import { mkdirSync, writeFileSync } from "node:fs"
 import { dirname, extname, resolve } from "node:path"
-import { ImageTransportError, resolveStatusCode } from "../errors"
+import {
+  ImageTransportError,
+  InvalidImageInputError,
+  resolveStatusCode,
+  UnsupportedImageEditCapabilityError,
+} from "../errors"
 import { normalizeTokenUsage, toPlainObject } from "../helpers"
 import { inspectImageAsset } from "../helpers/image-asset"
 import type { AIProviderConfigEntry } from "../types"
+import type { ImageInput } from "../types/image-input"
 import type {
+  ImageEditRequest,
   ImageGenerationCapabilities,
   ImageGenerationClient,
   ImageGenerationRequest,
   ImageGenerationResponse,
 } from "../types/image-generation.request"
 
-export class GeminiGenerateImageClient implements ImageGenerationClient {
-  readonly capabilities: ImageGenerationCapabilities = {
-    provider: "gemini",
-    negativePrompt: true,
-    aspectRatio: true,
-  }
+/**
+ * Modelos de Gemini verificados como capaces de editar una imagen existente.
+ *
+ * La lista es deliberadamente cerrada: ante un modelo desconocido la librería
+ * falla en lugar de enviar la imagen y devolver silenciosamente una generación
+ * nueva desde cero. Si has verificado otro modelo, actívalo con
+ * `allowUnverifiedImageEdit`.
+ */
+const IMAGE_EDIT_MODEL_PREFIXES = [
+  "gemini-3-pro-image",
+  "gemini-3.1-flash-image",
+  "gemini-3.1-flash-lite-image",
+  "gemini-2.5-flash-image",
+] as const
 
+export type GeminiGenerateImageClientConfig = AIProviderConfigEntry & {
+  /**
+   * Permite `edit()` con un modelo fuera de `IMAGE_EDIT_MODEL_PREFIXES`.
+   * Úsalo sólo si has comprobado que el modelo respeta la imagen de entrada.
+   */
+  allowUnverifiedImageEdit?: boolean
+}
+
+export class GeminiGenerateImageClient implements ImageGenerationClient {
   private ai: GoogleGenAI
 
-  constructor(private readonly cfg: AIProviderConfigEntry) {
+  constructor(private readonly cfg: GeminiGenerateImageClientConfig) {
     this.ai = new GoogleGenAI({
       apiKey: this.cfg.apiKey,
     })
@@ -29,6 +53,15 @@ export class GeminiGenerateImageClient implements ImageGenerationClient {
 
   get model(): string {
     return this.cfg.model
+  }
+
+  get capabilities(): ImageGenerationCapabilities {
+    return {
+      provider: "gemini",
+      negativePrompt: true,
+      aspectRatio: true,
+      imageEdit: this.supportsImageEdit(),
+    }
   }
 
   async execute(
@@ -43,22 +76,108 @@ export class GeminiGenerateImageClient implements ImageGenerationClient {
         config: this.buildGeminiImageConfig(context),
       })
     } catch (error) {
-      const statusCode = resolveStatusCode(error)
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Gemini image generation request failed."
-
-      throw new ImageTransportError(message, {
-        statusCode,
-        raw:
-          error && typeof error === "object"
-            ? toPlainObject(error)
-            : { message },
-      })
+      throw this.toTransportError(
+        error,
+        "Gemini image generation request failed."
+      )
     }
 
-    const outputPath = resolve(context.outputPath)
+    return this.persistGeneratedImage(response, context.outputPath)
+  }
+
+  /**
+   * Genera una versión transformada de `context.image` según `context.prompt`.
+   *
+   * La imagen de entrada es la base de la edición, no una garantía de que el
+   * sujeto o la geometría se preserven: eso depende del modelo.
+   *
+   * No envía `imageConfig`: deja que el modelo decida el encuadre a partir de la
+   * imagen de entrada, en lugar de imponer un aspect ratio que compita con la
+   * instrucción.
+   */
+  async edit(context: ImageEditRequest): Promise<ImageGenerationResponse> {
+    this.assertImageEditSupported()
+    const inlineData = this.toInlineData(context.image)
+
+    let response: unknown
+
+    try {
+      response = await this.ai.models.generateContent({
+        model: this.cfg.model,
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: context.prompt.trim() }, { inlineData }],
+          },
+        ],
+        config: {
+          abortSignal: context.signal,
+          responseModalities: ["IMAGE"],
+        },
+      })
+    } catch (error) {
+      throw this.toTransportError(error, "Gemini image edit request failed.")
+    }
+
+    return this.persistGeneratedImage(response, context.outputPath)
+  }
+
+  private supportsImageEdit(): boolean {
+    if (this.cfg.allowUnverifiedImageEdit === true) return true
+
+    const model = this.cfg.model.trim().toLowerCase()
+    return IMAGE_EDIT_MODEL_PREFIXES.some((prefix) => model.startsWith(prefix))
+  }
+
+  private assertImageEditSupported(): void {
+    if (this.supportsImageEdit()) return
+
+    throw new UnsupportedImageEditCapabilityError({
+      provider: "gemini",
+      model: this.cfg.model,
+      reason: `it is not one of the known image-editing models (${IMAGE_EDIT_MODEL_PREFIXES.join(", ")}); enable 'allowUnverifiedImageEdit' only after verifying it`,
+    })
+  }
+
+  private toInlineData(image: ImageInput): {
+    data: string
+    mimeType: string
+  } {
+    if (!image || typeof image !== "object") {
+      throw new InvalidImageInputError("the image object is missing")
+    }
+
+    if (!(image.bytes instanceof Uint8Array) || image.bytes.byteLength === 0) {
+      throw new InvalidImageInputError("'bytes' must be a non-empty Uint8Array")
+    }
+
+    if (typeof image.mimeType !== "string" || !image.mimeType.trim()) {
+      throw new InvalidImageInputError("'mimeType' must be a non-empty string")
+    }
+
+    return {
+      // Los bytes se codifican para el transporte sin recodificar la imagen, y
+      // el MIME declarado viaja tal cual.
+      data: Buffer.from(image.bytes).toString("base64"),
+      mimeType: image.mimeType,
+    }
+  }
+
+  private toTransportError(error: unknown, fallbackMessage: string) {
+    const message = error instanceof Error ? error.message : fallbackMessage
+
+    return new ImageTransportError(message, {
+      statusCode: resolveStatusCode(error),
+      raw:
+        error && typeof error === "object" ? toPlainObject(error) : { message },
+    })
+  }
+
+  private persistGeneratedImage(
+    response: unknown,
+    requestedPath: string
+  ): ImageGenerationResponse {
+    const outputPath = resolve(requestedPath)
     mkdirSync(dirname(outputPath), { recursive: true })
 
     const generated = this.resolveGeneratedImageFromContent(response)
