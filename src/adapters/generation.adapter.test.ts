@@ -70,7 +70,7 @@ describe("generation adapters", () => {
     const image = new ImageGenerationAdapter({
       provider: "gemini",
       apiKey: "test-key",
-      model: "gemini-image",
+      model: "gemini-3-pro-image",
     })
     const video = new VideoGenerationAdapter({
       provider: "gemini",
@@ -83,6 +83,11 @@ describe("generation adapters", () => {
       width: 1024,
       height: 1024,
     }
+    const imageEditRequest = {
+      image: { bytes: new Uint8Array([1, 2, 3]), mimeType: "image/jpeg" },
+      prompt: "Edit the image.",
+      outputPath: "/tmp/edited.png",
+    }
     const videoRequest = {
       prompt: "Generate a video.",
       outputPath: "/tmp/video.mp4",
@@ -91,6 +96,13 @@ describe("generation adapters", () => {
     }
     const imageResponse = {
       asset: { kind: "file" as const, path: "/tmp/image.png" },
+      mimeType: "image/png",
+      sizeBytes: 1,
+      width: 1024,
+      height: 1024,
+    }
+    const imageEditResponse = {
+      asset: { kind: "file" as const, path: "/tmp/edited.png" },
       mimeType: "image/png",
       sizeBytes: 1,
       width: 1024,
@@ -106,6 +118,9 @@ describe("generation adapters", () => {
       image as unknown as {
         client: {
           execute: (value: typeof imageRequest) => Promise<typeof imageResponse>
+          edit: (
+            value: typeof imageEditRequest
+          ) => Promise<typeof imageEditResponse>
         }
       }
     ).client
@@ -120,6 +135,10 @@ describe("generation adapters", () => {
       expect(value).toBe(imageRequest)
       return imageResponse
     }
+    imageClient.edit = async (value) => {
+      expect(value).toBe(imageEditRequest)
+      return imageEditResponse
+    }
     videoClient.execute = async (value) => {
       expect(value).toBe(videoRequest)
       return videoResponse
@@ -129,6 +148,7 @@ describe("generation adapters", () => {
       provider: "gemini",
       negativePrompt: true,
       aspectRatio: true,
+      imageEdit: true,
     })
     expect(video.capabilities).toEqual({
       provider: "gemini",
@@ -136,7 +156,24 @@ describe("generation adapters", () => {
       polling: true,
     })
     await expect(image.execute(imageRequest)).resolves.toBe(imageResponse)
+    await expect(image.edit(imageEditRequest)).resolves.toBe(imageEditResponse)
     await expect(video.execute(videoRequest)).resolves.toBe(videoResponse)
+  })
+
+  test("reports imageEdit per model instead of per provider", () => {
+    const editing = new ImageGenerationAdapter({
+      provider: "gemini",
+      apiKey: "test-key",
+      model: "gemini-3-pro-image",
+    })
+    const legacy = new ImageGenerationAdapter({
+      provider: "gemini",
+      apiKey: "test-key",
+      model: "imagen-3.0-generate-002",
+    })
+
+    expect(editing.capabilities.imageEdit).toBe(true)
+    expect(legacy.capabilities.imageEdit).toBe(false)
   })
 
   test("rejects a provider unsupported by each generation capability", () => {
