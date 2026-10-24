@@ -26,6 +26,7 @@ export type {
 export type { ImageInput } from "./types/image-input"
 export type {
   StructuredOutputFormat,
+  TextConversationMessage,
   TextFunctionTool,
   TextGenerationCapabilities,
   TextGenerationClient,

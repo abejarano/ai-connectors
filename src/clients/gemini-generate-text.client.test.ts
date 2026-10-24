@@ -2,6 +2,22 @@ import { describe, expect, mock, test } from "bun:test"
 import { GeminiGenerateTextClient } from "./gemini-generate-text.client"
 
 describe("GeminiGenerateTextClient", () => {
+  test("rejects conversation history locally instead of silently dropping messages", async () => {
+    const generateContent = mock(async () => ({ text: "unused" }))
+    const client = createClient(generateContent)
+    expect(client.capabilities.conversationHistory).toBe(false)
+    await expect(
+      client.execute({
+        systemPrompt: "System",
+        messages: [{ role: "user", content: "user" }],
+        retryPolicy: { maxRetries: 1 },
+      })
+    ).rejects.toMatchObject({
+      code: "text_generation_capability_unsupported",
+      details: { capability: "conversation_history" },
+    })
+    expect(generateContent).not.toHaveBeenCalled()
+  })
   test("retries retryable provider failures according to retryPolicy", async () => {
     const generateContent = mock(async () => {
       if (generateContent.mock.calls.length === 1) {

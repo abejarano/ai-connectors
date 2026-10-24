@@ -134,6 +134,137 @@ console.log(result.usage)
 
 DeepSeek soporta streaming y function tools normalizados en `TextGenerationRequest`. Para salida estructurada, garantiza un objeto JSON, pero no la conformidad estricta con JSON Schema: las solicitudes con `responseFormat.strict: true` fallan localmente antes de llamar al proveedor. DeepSeek puede analizar imágenes de entrada, pero no genera imágenes; usa `ImageGenerationAdapter` con `provider: "gemini"` para generar assets.
 
+### Conversaciones y herramientas con DeepSeek
+
+`TextGenerationRequest` acepta `userPrompt` o `messages`, de forma excluyente.
+`systemPrompt` se mantiene en ambos casos. `messages` contiene el historial completo,
+incluido el mensaje que inicia o continúa la solicitud; no se añade otro usuario.
+La capacidad `conversationHistory` es `true` en DeepSeek y `false` en Gemini.
+Gemini rechaza `messages` localmente con `UnsupportedTextGenerationCapabilityError`.
+
+Con herramientas y razonamiento activo, conserva `reasoningContent` de **todos**
+los mensajes del asistente al reenviar el historial. Es información de continuación:
+no la recortes ni la mezcles con `text`. DeepSeek la necesita incluso en turnos sin
+llamadas a herramientas. En streaming se acumula en la respuesta final; `onTextChunk`
+sólo entrega texto de la respuesta.
+
+```ts
+import {
+  TextGenerationAdapter,
+  type TextConversationMessage,
+  type TextFunctionTool,
+} from "@abejarano/ai-connectors"
+
+const client = new TextGenerationAdapter({
+  provider: "deepseek",
+  apiKey: process.env.DEEPSEEK_API_KEY!,
+  model: "deepseek-flash",
+})
+const tools: TextFunctionTool[] = [
+  {
+    type: "function",
+    function: {
+      name: "lookup",
+      parameters: {
+        type: "object",
+        properties: { id: { type: "integer" } },
+        required: ["id"],
+      },
+    },
+  },
+]
+const messages: TextConversationMessage[] = [
+  { role: "user", content: "Busca el registro 7." },
+]
+
+// El consumidor ejecuta las herramientas y conserva el historial entre solicitudes.
+// Aplicar también un límite de turnos y validar los argumentos antes de ejecutarlas.
+for (let turn = 0; turn < 8; turn += 1) {
+  const result = await client.execute({
+    systemPrompt: "Consulta los registros con lookup.",
+    messages,
+    tools,
+  })
+  if (
+    result.finishReason === "length" ||
+    result.finishReason === "content_filter"
+  ) {
+    throw new Error(`Respuesta incompleta: ${result.finishReason}`)
+  }
+  messages.push({
+    role: "assistant",
+    content: result.text,
+    reasoningContent: result.reasoningContent,
+    toolCalls: result.toolCalls,
+  })
+  if (!result.toolCalls?.length) {
+    console.log(result.text)
+    break
+  }
+  for (const call of result.toolCalls) {
+    if (call.name !== "lookup") throw new Error("Herramienta desconocida")
+    const args = JSON.parse(call.arguments) as { id?: unknown }
+    if (typeof args.id !== "number" || !Number.isInteger(args.id)) {
+      throw new Error("lookup requiere un id entero")
+    }
+    // Sustituir este resultado de ejemplo por la consulta a tu servicio.
+    const record = { id: args.id, title: "Registro de ejemplo" }
+    messages.push({
+      role: "tool",
+      toolCallId: call.id,
+      content: JSON.stringify(record),
+    })
+  }
+}
+```
+
+DeepSeek activa razonamiento con esfuerzo `high` por defecto. Se admite
+`reasoning.effort: "none"` para desactivarlo; `medium` se normaliza a `high`.
+`toolChoice: "required"` y la selección de una función concreta requieren
+`reasoning: { effort: "none" }`; la combinación incompatible falla antes de enviar
+la solicitud. `auto` y `none` se admiten con razonamiento activo.
+
+Para funciones con `strict: true` en el endpoint oficial, configura
+`baseUrl: "https://api.deepseek.com/beta"` y marca **todas** las funciones como
+estrictas. Sus esquemas deben ajustarse al subconjunto admitido por DeepSeek.
+Este modo estricto de herramientas no cambia las capacidades de `responseFormat`.
+Los endpoints personalizados conservan la ruta y delegan el soporte de `strict`
+a su servidor. Véanse [Thinking Mode](https://api-docs.deepseek.com/guides/thinking_mode/)
+y [Tool Calls](https://api-docs.deepseek.com/guides/tool_calls/).
+
+### Finalización, cancelación y reintentos
+
+En DeepSeek, `finishReason` conserva el motivo informado por el proveedor.
+`length` y `content_filter` devuelven el texto disponible, sin reintentos automáticos;
+comprueba este campo antes de procesar JSON o argumentos de herramientas. Se puede
+recibir contenido vacío o JSON incompleto. `stop` indica finalización normal y
+`tool_calls` indica que deben atenderse las herramientas solicitadas.
+
+`aborted`, `insufficient_system_resource` y un stream que termina sin `[DONE]`
+producen un error de transporte reintentable. `retryPolicy` sólo reintenta si no se
+han entregado fragmentos a `onTextChunk`; así se evita repetir texto ya consumido.
+Los lectores de streaming se cancelan y liberan tanto al terminar como al fallar.
+
+Texto DeepSeek y multimodal de ambos proveedores admiten `signal`, `timeoutMs` y
+`retryPolicy: { maxRetries, retryDelayMs }`. El timeout se aplica por intento;
+no se establece uno por defecto y `maxRetries` es cero si se omite. La cancelación
+del consumidor detiene nuevos intentos y la espera entre ellos. Los errores HTTP
+de DeepSeek conservan el cuerpo original en `error.details.raw.response`, incluidos
+los errores de proxies con HTML, y el estado en `error.details.statusCode`.
+
+### Modelos de visión DeepSeek
+
+En `https://api.deepseek.com`, el cliente multimodal anuncia `imageInput: true`
+para `deepseek-flash`, `deepseek-v4-flash` y `deepseek-v4-flash-vision-exp`.
+Los dos últimos son alias legados servidos actualmente por Flash.
+`deepseek-v4-pro` y los nombres no reconocidos anuncian `false` y rechazan imágenes
+antes de llamar al proveedor. Si se configura un endpoint con otro hostname, el
+cliente permite modelos personalizados y delega la compatibilidad a ese servidor.
+Véase la [guía oficial de visión](https://api-docs.deepseek.com/guides/vision/).
+
+La [simulación local de contrato](postman/README.md) permite verificar el transporte
+por HTTP sin credenciales ni llamadas al proveedor real.
+
 ### Salida estructurada
 
 ```ts

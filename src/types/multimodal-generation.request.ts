@@ -2,6 +2,7 @@ import type { ImageInput } from "./image-input"
 import type {
   StructuredOutputFormat,
   TextGenerationResponse,
+  TextRetryPolicy,
 } from "./text-generation.request"
 
 /** @deprecated usa `ImageInput`. */
@@ -14,6 +15,8 @@ export type MultimodalGenerationRequest = {
   maxOutputTokens?: number
   responseFormat?: StructuredOutputFormat
   signal?: AbortSignal
+  timeoutMs?: number
+  retryPolicy?: TextRetryPolicy
 }
 
 export type MultimodalGenerationCapabilities = {
