@@ -33,9 +33,22 @@ export type TextToolCall = {
   arguments: string
 }
 
+export type TextConversationMessage =
+  | { role: "user"; content: string }
+  | {
+      role: "assistant"
+      content: string | null
+      /** Preserve exactly when continuing a thinking conversation with tools. */
+      reasoningContent?: string
+      toolCalls?: readonly TextToolCall[]
+    }
+  | { role: "tool"; content: string; toolCallId: string }
+
 export type TextGenerationCapabilities = {
   streaming: boolean
   functionTools: boolean
+  /** An omitted value means conversation history is not supported. */
+  conversationHistory?: boolean
   structuredOutput: {
     jsonObject: boolean
     jsonSchema: "enforced" | "best_effort" | "unsupported"
@@ -49,7 +62,6 @@ export type TextRetryPolicy = {
 
 export type TextGenerationRequest = {
   systemPrompt: string
-  userPrompt: string
   maxOutputTokens?: number
   responseFormat?: StructuredOutputFormat
   signal?: AbortSignal
@@ -62,12 +74,18 @@ export type TextGenerationRequest = {
   retryPolicy?: TextRetryPolicy
   tools?: TextFunctionTool[]
   toolChoice?: TextToolChoice
-}
+} & (
+  | { userPrompt: string; messages?: never }
+  | { userPrompt?: never; messages: readonly TextConversationMessage[] }
+)
 
 export type TextGenerationResponse = {
   text: string
   usage?: TokenUsage
   toolCalls?: TextToolCall[]
+  reasoningContent?: string
+  /** DeepSeek returns partial output for length/content_filter; inspect before parsing. */
+  finishReason?: string
 }
 
 export interface TextGenerationClient {

@@ -1,6 +1,75 @@
 import { expect, mock, test } from "bun:test"
 import { GeminiGenerateMultimodalClient } from "./gemini-generate-multimodal.client"
 
+test("honors multimodal retries and per-attempt timeouts", async () => {
+  const client = new GeminiGenerateMultimodalClient({
+    apiKey: "test-key",
+    model: "gemini-test",
+  })
+  const request = { systemPrompt: "system", userPrompt: "user", images: [] }
+  const generateContent = mock(async (): Promise<{ text: string }> => {
+    if (generateContent.mock.calls.length === 1)
+      throw Object.assign(new Error("busy"), { status: 503 })
+    return { text: "recovered" }
+  })
+  ;(client as unknown as { ai: { models: unknown } }).ai = {
+    models: { generateContent },
+  }
+  await expect(
+    client.execute({ ...request, retryPolicy: { maxRetries: 1 } })
+  ).resolves.toMatchObject({ text: "recovered" })
+  expect(generateContent).toHaveBeenCalledTimes(2)
+
+  const hanging = mock(
+    async (input: { config: { abortSignal: AbortSignal } }) =>
+      new Promise((_resolve, reject) => {
+        input.config.abortSignal.addEventListener(
+          "abort",
+          () => reject(new DOMException("aborted", "AbortError")),
+          { once: true }
+        )
+      })
+  )
+  ;(client as unknown as { ai: { models: unknown } }).ai = {
+    models: { generateContent: hanging },
+  }
+  await expect(
+    client.execute({ ...request, timeoutMs: 5, retryPolicy: { maxRetries: 1 } })
+  ).rejects.toThrow("timed out after 5ms")
+  expect(hanging).toHaveBeenCalledTimes(2)
+})
+
+test("does not retry Gemini multimodal requests after caller cancellation", async () => {
+  const client = new GeminiGenerateMultimodalClient({
+    apiKey: "test-key",
+    model: "gemini-test",
+  })
+  const generateContent = mock(
+    async (input: { config: { abortSignal: AbortSignal } }) =>
+      new Promise((_resolve, reject) => {
+        input.config.abortSignal.addEventListener(
+          "abort",
+          () => reject(new DOMException("aborted", "AbortError")),
+          { once: true }
+        )
+      })
+  )
+  ;(client as unknown as { ai: { models: unknown } }).ai = {
+    models: { generateContent },
+  }
+  const controller = new AbortController()
+  const execution = client.execute({
+    systemPrompt: "system",
+    userPrompt: "user",
+    images: [],
+    signal: controller.signal,
+    retryPolicy: { maxRetries: 2 },
+  })
+  controller.abort()
+  await expect(execution).rejects.toThrow("aborted")
+  expect(generateContent).toHaveBeenCalledTimes(1)
+})
+
 test("sends image bytes alongside the prompt with the structured-output schema", async () => {
   const generateContent = mock(async () => ({ text: '{"elements":[]}' }))
   const client = new GeminiGenerateMultimodalClient({
@@ -35,7 +104,7 @@ test("sends image bytes alongside the prompt with the structured-output schema",
       },
     ],
     config: {
-      abortSignal: undefined,
+      abortSignal: expect.any(AbortSignal),
       systemInstruction: "system",
       maxOutputTokens: undefined,
       responseMimeType: "application/json",
@@ -74,7 +143,7 @@ test("requests a JSON object without a schema", async () => {
       },
     ],
     config: {
-      abortSignal: undefined,
+      abortSignal: expect.any(AbortSignal),
       systemInstruction: "system",
       maxOutputTokens: undefined,
       responseMimeType: "application/json",

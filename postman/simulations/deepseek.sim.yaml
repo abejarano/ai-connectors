@@ -1,0 +1,5 @@
+simulation: deepseek-client-contract
+routing: path
+mocks:
+  - routeKey: deepseek
+    path: ../mocks/deepseek/config.yaml

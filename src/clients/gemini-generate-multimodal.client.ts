@@ -1,6 +1,5 @@
 import { type GenerateContentConfig, GoogleGenAI } from "@google/genai"
-import { createTextTransportError, resolveStatusCode } from "../errors"
-import { normalizeTokenUsage, toPlainObject } from "../helpers"
+import { normalizeTokenUsage } from "../helpers"
 import type { AIProviderConfigEntry } from "../types"
 import type {
   MultimodalGenerationCapabilities,
@@ -9,6 +8,7 @@ import type {
 } from "../types/multimodal-generation.request"
 import type { TextGenerationResponse } from "../types/text-generation.request"
 import { Buffer } from "node:buffer"
+import { executeTextTransport } from "./text-generation-transport"
 
 export class GeminiGenerateMultimodalClient implements MultimodalGenerationClient {
   readonly capabilities: MultimodalGenerationCapabilities = {
@@ -33,7 +33,7 @@ export class GeminiGenerateMultimodalClient implements MultimodalGenerationClien
   async execute(
     context: MultimodalGenerationRequest
   ): Promise<TextGenerationResponse> {
-    try {
+    return executeTextTransport(this.model, context, async (signal) => {
       const response = await this.ai.models.generateContent({
         model: this.cfg.model,
         contents: [
@@ -50,37 +50,22 @@ export class GeminiGenerateMultimodalClient implements MultimodalGenerationClien
             ],
           },
         ],
-        config: this.buildRequestConfig(context),
+        config: this.buildRequestConfig(context, signal),
       })
 
       return {
         text: response.text?.trim() || "",
         usage: normalizeTokenUsage(response.usageMetadata),
       }
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Gemini multimodal generation request failed."
-
-      throw createTextTransportError({
-        model: this.cfg.model,
-        message,
-        statusCode: resolveStatusCode(error),
-        raw:
-          error && typeof error === "object"
-            ? toPlainObject(error)
-            : { message },
-        cause: error,
-      })
-    }
+    })
   }
 
   private buildRequestConfig(
-    context: MultimodalGenerationRequest
+    context: MultimodalGenerationRequest,
+    signal: AbortSignal
   ): GenerateContentConfig {
     const config: GenerateContentConfig = {
-      abortSignal: context.signal,
+      abortSignal: signal,
       systemInstruction: context.systemPrompt.trim(),
       maxOutputTokens: context.maxOutputTokens,
     }

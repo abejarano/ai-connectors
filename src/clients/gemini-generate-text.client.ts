@@ -1,6 +1,10 @@
 import { type GenerateContentConfig, GoogleGenAI } from "@google/genai"
 import type { TextTransportError } from "../errors"
-import { createTextTransportError, resolveStatusCode } from "../errors"
+import {
+  createTextTransportError,
+  resolveStatusCode,
+  UnsupportedTextGenerationCapabilityError,
+} from "../errors"
 import { normalizeTokenUsage, toPlainObject } from "../helpers"
 import type { AIProviderConfigEntry } from "../types"
 import type {
@@ -15,6 +19,7 @@ export class GeminiGenerateTextClient implements TextGenerationClient {
   readonly capabilities: TextGenerationCapabilities = {
     streaming: true,
     functionTools: true,
+    conversationHistory: false,
     structuredOutput: {
       jsonObject: true,
       jsonSchema: "enforced",
@@ -36,6 +41,12 @@ export class GeminiGenerateTextClient implements TextGenerationClient {
   async execute(
     context: TextGenerationRequest
   ): Promise<TextGenerationResponse> {
+    if (context.messages !== undefined) {
+      throw new UnsupportedTextGenerationCapabilityError(
+        "conversation_history",
+        "gemini"
+      )
+    }
     const maxRetries = normalizeNonNegativeInteger(
       context.retryPolicy?.maxRetries
     )
@@ -90,7 +101,7 @@ export class GeminiGenerateTextClient implements TextGenerationClient {
     onTextChunkEmitted: () => void
   ): Promise<TextGenerationResponse> {
     const config = this.buildRequestConfig(context, signal)
-    const rawInput = context.userPrompt.trim()
+    const rawInput = context.userPrompt!.trim()
 
     if (context.stream) {
       const stream = await this.ai.models.generateContentStream({

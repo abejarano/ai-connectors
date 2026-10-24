@@ -26,14 +26,16 @@ export const createTextTransportError = (input: {
   statusCode?: number
   raw?: unknown
   cause?: unknown
+  retryable?: boolean
 }): TextTransportError => {
   const details: TextRuntimeErrorDescriptor = {
     code: "text_transport_error",
     message: input.message,
     model: input.model,
     retryable:
-      isRetryableStatusCode(input.statusCode) ||
-      (input.statusCode === undefined && isRetryableCause(input.cause)),
+      input.retryable ??
+      (isRetryableStatusCode(input.statusCode) ||
+        (input.statusCode === undefined && isRetryableCause(input.cause))),
     statusCode: input.statusCode,
     raw: input.raw,
     cause:

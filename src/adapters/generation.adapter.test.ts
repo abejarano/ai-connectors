@@ -51,7 +51,7 @@ describe("generation adapters", () => {
     const deepseek = new MultimodalGenerationAdapter({
       provider: "deepseek",
       apiKey: "test-key",
-      model: "deepseek-vl",
+      model: "deepseek-flash",
     })
 
     expect(gemini.capabilities).toEqual({
